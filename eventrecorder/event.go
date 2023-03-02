@@ -6,103 +6,99 @@ import (
 	"time"
 
 	"github.com/filecoin-project/lassie/pkg/types"
-	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 var (
-	validPhases     = []string{"indexer", "query", "retrieval"}
-	validEventNames = []string{
-		"accepted",
-		"candidates-filtered",
-		"candidates-found",
-		"connected",
-		"failure",
-		"first-byte-received",
-		"proposed",
-		"query-asked",
-		"query-asked-filtered",
-		"started",
-		"success",
+	errInvalidPhase     = fmt.Errorf("phase must be one of: [%s %s %s]", types.IndexerPhase, types.QueryPhase, types.RetrievalPhase)
+	errInvalidEventCode error
+	emptyRetrievalID    types.RetrievalID
+	eventCodes          = map[types.EventCode]any{
+		types.CandidatesFoundCode:    nil,
+		types.CandidatesFilteredCode: nil,
+		types.StartedCode:            nil,
+		types.ConnectedCode:          nil,
+		types.QueryAskedCode:         nil,
+		types.QueryAskedFilteredCode: nil,
+		types.ProposedCode:           nil,
+		types.AcceptedCode:           nil,
+		types.FirstByteCode:          nil,
+		types.FailedCode:             nil,
+		types.SuccessCode:            nil,
 	}
 )
 
+func init() {
+	codes := make([]types.EventCode, 0, len(eventCodes))
+	for code := range eventCodes {
+		codes = append(codes, code)
+	}
+	errInvalidEventCode = fmt.Errorf("eventName must be one of: %v", codes)
+}
+
 type event struct {
-	RetrievalId       *types.RetrievalID `json:"retrievalId"`
-	InstanceId        *string            `json:"instanceId,omitempty"`
-	Cid               *string            `json:"cid"`
-	StorageProviderId *string            `json:"storageProviderId"`
-	Phase             *types.Phase       `json:"phase"`
-	PhaseStartTime    *time.Time         `json:"phaseStartTime"`
-	EventName         *types.EventCode   `json:"eventName"`
-	EventTime         *time.Time         `json:"eventTime"`
-	EventDetails      interface{}        `json:"eventDetails,omitempty"`
+	RetrievalId       types.RetrievalID `json:"retrievalId"`
+	InstanceId        string            `json:"instanceId,omitempty"`
+	Cid               string            `json:"cid"`
+	StorageProviderId string            `json:"storageProviderId"`
+	Phase             types.Phase       `json:"phase"`
+	PhaseStartTime    time.Time         `json:"phaseStartTime"`
+	EventName         types.EventCode   `json:"eventName"`
+	EventTime         time.Time         `json:"eventTime"`
+	EventDetails      any               `json:"eventDetails,omitempty"`
 }
 
 func (e event) validate() error {
-	// RetrievalId
-	if e.RetrievalId == nil {
+	switch {
+	case e.RetrievalId == emptyRetrievalID:
 		return errors.New("property retrievalId is required")
-	}
-	if _, err := uuid.Parse(e.RetrievalId.String()); err != nil {
-		return errors.New("property retrievalId should be a valid v4 uuid")
-	}
-
-	// InstanceId
-	if e.InstanceId == nil {
+	case e.InstanceId == "":
 		return errors.New("property instanceId is required")
-	}
-
-	// Cid
-	if e.Cid == nil {
+	case e.Cid == "":
 		return errors.New("property cid is required")
-	}
-
-	// StorageProviderId
-	if e.StorageProviderId == nil {
+	case e.StorageProviderId == "":
 		return errors.New("property storageProviderId is required")
-	}
-
-	// Phase
-	if e.Phase == nil {
+	case e.Phase == "":
 		return errors.New("property phase is required")
-	}
-	isValidPhase := false
-	for _, phase := range validPhases {
-		if string(*e.Phase) == phase {
-			isValidPhase = true
-			break
-		}
-	}
-	if !isValidPhase {
-		return fmt.Errorf("property phase failed validation. Phase must be created with one of the following values: %v", validPhases)
-	}
-
-	// PhaseStartTime
-	if e.PhaseStartTime == nil {
+	case !validPhase(e.Phase):
+		return errInvalidPhase
+	case e.PhaseStartTime.IsZero():
 		return errors.New("property phaseStartTime is required")
-	}
-
-	// EventName
-	if e.EventName == nil {
+	case e.PhaseStartTime.After(time.Now()):
+		return errors.New("property phaseStartTime cannot be in the future")
+	case e.EventName == "":
 		return errors.New("property eventName is required")
-	}
-	isValidEventName := false
-	for _, phase := range validEventNames {
-		if string(*e.EventName) == phase {
-			isValidEventName = true
-			break
-		}
-	}
-	if !isValidEventName {
-		return fmt.Errorf("property eventName failed validation. Event name must be created with one of the following values: %v", validEventNames)
-	}
-
-	// EventTime
-	if e.EventTime == nil {
+	case !validEventCode(e.EventName):
+		return errInvalidEventCode
+	case e.EventTime.IsZero():
 		return errors.New("property eventTime is required")
+	case e.EventTime.After(time.Now()):
+		return errors.New("property eventTime cannot be in the future")
+	default:
+		_, err := cid.Decode(e.Cid)
+		if err != nil {
+			return fmt.Errorf("cid must be valid: %w", err)
+		}
+		if _, err := peer.Decode(e.StorageProviderId); err != nil {
+			return fmt.Errorf("storageProviderId must be valid: %w", err)
+		}
+		return nil
 	}
+}
 
-	return nil
+func validPhase(phase types.Phase) bool {
+	switch phase {
+	case types.IndexerPhase, types.QueryPhase, types.RetrievalPhase:
+		return true
+	default:
+		return false
+	}
+}
+
+func validEventCode(code types.EventCode) bool {
+	_, ok := eventCodes[code]
+	return ok
 }
 
 type eventBatch struct {
@@ -110,15 +106,13 @@ type eventBatch struct {
 }
 
 func (e eventBatch) validate() error {
-	if e.Events == nil {
+	if len(e.Events) == 0 {
 		return errors.New("property events is required")
 	}
-
 	for _, event := range e.Events {
 		if err := event.validate(); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
