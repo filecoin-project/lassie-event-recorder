@@ -3,18 +3,16 @@ package eventrecorder
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/ipfs/go-log/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var logger = log.Logger("lassie/event_recorder")
+var logger = log.Logger("lassie/eventrecorder")
 
 type EventRecorder struct {
 	cfg    *config
@@ -22,10 +20,10 @@ type EventRecorder struct {
 	db     *pgxpool.Pool
 }
 
-func NewEventRecorder(ctx context.Context, opts ...option) (*EventRecorder, error) {
+func NewEventRecorder(opts ...Option) (*EventRecorder, error) {
 	cfg, err := newConfig(opts)
 	if err != nil {
-		return nil, errors.New(fmt.Sprint("Failed to apply option:", err))
+		return nil, fmt.Errorf("failed to apply option: %w", err)
 	}
 
 	var recorder EventRecorder
@@ -39,22 +37,20 @@ func NewEventRecorder(ctx context.Context, opts ...option) (*EventRecorder, erro
 		IdleTimeout:       recorder.cfg.httpServerWriteTimeout,
 		MaxHeaderBytes:    recorder.cfg.httpServerMaxHeaderBytes,
 	}
-
-	poolConfig, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
-	if err != nil {
-		return nil, errors.New(fmt.Sprint("Unable to parse DATABASE_URL:", err))
-	}
-
-	db, err := pgxpool.NewWithConfig(ctx, poolConfig)
-	if err != nil {
-		return nil, errors.New(fmt.Sprint("Failed to create connection pool:", err))
-	}
-	recorder.db = db
-
 	return &recorder, nil
 }
 
-func (r *EventRecorder) Start(_ context.Context) error {
+func (r *EventRecorder) Start(ctx context.Context) error {
+	var err error
+	r.db, err = pgxpool.NewWithConfig(ctx, r.cfg.pgxPoolConfig)
+	if err != nil {
+		return fmt.Errorf("failed to instantiate dabase connection: %w", err)
+	}
+	r.server.RegisterOnShutdown(func() {
+		logger.Info("Closing database connection...")
+		r.db.Close()
+		logger.Info("Database connection closed successfully.")
+	})
 	ln, err := net.Listen("tcp", r.server.Addr)
 	if err != nil {
 		return err
@@ -71,10 +67,11 @@ func (r *EventRecorder) httpServerMux() *http.ServeMux {
 }
 
 func (r *EventRecorder) handleRetrievalEvents(res http.ResponseWriter, req *http.Request) {
+	logger := logger.With("method", req.Method, "path", req.URL.Path)
 	if req.Method != http.MethodPost {
 		res.Header().Add("Allow", http.MethodPost)
 		http.Error(res, "", http.StatusMethodNotAllowed)
-		logger.Infof("%s %s %d", req.Method, req.URL.Path, http.StatusMethodNotAllowed)
+		logger.Warn("Rejected disallowed method")
 		return
 	}
 
@@ -82,7 +79,7 @@ func (r *EventRecorder) handleRetrievalEvents(res http.ResponseWriter, req *http
 	contentType := req.Header.Get("Content-Type")
 	if !strings.HasPrefix(contentType, "application/json") {
 		http.Error(res, "Not an acceptable content type. Content type must be application/json.", http.StatusBadRequest)
-		logger.Infof("%s %s %d", req.Method, req.URL.Path, http.StatusBadRequest)
+		logger.Warn("Rejected bad request with non-json content type")
 		return
 	}
 
@@ -90,20 +87,22 @@ func (r *EventRecorder) handleRetrievalEvents(res http.ResponseWriter, req *http
 	var batch eventBatch
 	if err := json.NewDecoder(req.Body).Decode(&batch); err != nil {
 		http.Error(res, err.Error(), http.StatusBadRequest)
-		logger.Infof("%s %s %d", req.Method, req.URL.Path, http.StatusBadRequest)
+		logger.Warn("Rejected bad request with undecodable json body")
 		return
 	}
 
 	// Validate JSON
 	if err := batch.validate(); err != nil {
 		http.Error(res, err.Error(), http.StatusBadRequest)
-		logger.Infof("%s %s %d", req.Method, req.URL.Path, http.StatusBadRequest)
+		logger.Warn("Rejected bad request with invalid event")
 		return
 	}
 
-	ctx := context.Background()
-	var errs []error
+	logger = logger.With("total", len(batch.Events))
+	ctx := req.Context()
+	errs := make([]error, 0, len(batch.Events))
 	for _, event := range batch.Events {
+		// TODO: use db batching; this will not be performant at scale.
 		query := `
 		INSERT INTO retrieval_events(
 			retrieval_id,
@@ -118,7 +117,7 @@ func (r *EventRecorder) handleRetrievalEvents(res http.ResponseWriter, req *http
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		`
-		values := []interface{}{
+		_, err := r.db.Exec(ctx, query,
 			event.RetrievalId.String(),
 			event.InstanceId,
 			event.Cid,
@@ -128,24 +127,21 @@ func (r *EventRecorder) handleRetrievalEvents(res http.ResponseWriter, req *http
 			event.EventName,
 			event.EventTime,
 			event.EventDetails,
-		}
-		_, err := r.db.Exec(ctx, query, values...)
+		)
 		if err != nil {
-			logger.Errorw("Could not execute insert query for retrieval event", "values", values, "err", err.Error())
+			logger.Errorw("Failed to insert retrieval event", "event", event, "err", err)
 			errs = append(errs, err)
 			continue
 		}
-
 		logger.Debug("Saved retrieval event")
 	}
 
 	if len(errs) != 0 {
 		http.Error(res, "", http.StatusInternalServerError)
-		logger.Infof("%s %s %d", req.Method, req.URL.Path, http.StatusInternalServerError)
+		logger.Infow("At least one retrieval event insertion failed", "failed", len(errs))
 		return
-	} else {
-		logger.Infof("%s %s %d", req.Method, req.URL.Path, http.StatusOK)
 	}
+	logger.Infow("Successfully inserted events")
 }
 
 func (r *EventRecorder) Shutdown(ctx context.Context) error {
