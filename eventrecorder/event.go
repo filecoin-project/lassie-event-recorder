@@ -44,7 +44,7 @@ func (e event) validate() error {
 		return errors.New("property retrievalId is required")
 	}
 	if _, err := uuid.Parse(e.RetrievalId.String()); err != nil {
-		return errors.New("property retrievalId should be a valud v4 uuid")
+		return errors.New("property retrievalId should be a valid v4 uuid")
 	}
 
 	// InstanceId
