@@ -1,6 +1,9 @@
 package recorder
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type (
 	Option  func(*options) error
@@ -11,6 +14,14 @@ type (
 		httpServerWriteTimeout      time.Duration
 		httpServerIdleTimeout       time.Duration
 		httpServerMaxHeaderBytes    int
+
+		dbName       string
+		dbHost       string
+		dbPort       int
+		dbUser       string
+		dbPassword   string
+		dbParameters string
+		dbConnString string
 	}
 )
 
@@ -28,6 +39,7 @@ func newOptions(o ...Option) (*options, error) {
 			return nil, err
 		}
 	}
+	opts.dbConnString = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s %s", opts.dbHost, opts.dbPort, opts.dbUser, opts.dbPassword, opts.dbName, opts.dbParameters)
 	return &opts, nil
 }
 
