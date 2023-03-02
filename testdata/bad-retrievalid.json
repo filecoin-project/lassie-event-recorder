@@ -1,0 +1,14 @@
+{
+  "events": [
+    {
+      "retrievalId": "bad-retrieval-id",
+      "instanceId": "test-instance-id",
+      "cid": "test-cid",
+      "storageProviderId": "test-sp-id",
+      "phase": "query",
+      "phaseStartTime": "2023-03-02T00:15:50.479910907Z",
+      "eventName": "started",
+      "eventTime": "2023-03-02T00:15:52.361371026Z"
+    }
+  ]
+}

@@ -1,10 +1,9 @@
-package recorder
+package eventrecorder
 
 import "time"
 
 type (
-	Option  func(*options) error
-	options struct {
+	config struct {
 		httpServerListenAddr        string
 		httpServerReadTimeout       time.Duration
 		httpServerReadHeaderTimeout time.Duration
@@ -12,10 +11,11 @@ type (
 		httpServerIdleTimeout       time.Duration
 		httpServerMaxHeaderBytes    int
 	}
+	option func(*config) error
 )
 
-func newOptions(o ...Option) (*options, error) {
-	opts := options{
+func newConfig(opts []option) (*config, error) {
+	cfg := &config{
 		httpServerListenAddr:        "0.0.0.0:8080",
 		httpServerReadTimeout:       5 * time.Second,
 		httpServerReadHeaderTimeout: 5 * time.Second,
@@ -23,17 +23,17 @@ func newOptions(o ...Option) (*options, error) {
 		httpServerIdleTimeout:       10 * time.Second,
 		httpServerMaxHeaderBytes:    2048,
 	}
-	for _, apply := range o {
-		if err := apply(&opts); err != nil {
+	for _, opt := range opts {
+		if err := opt(cfg); err != nil {
 			return nil, err
 		}
 	}
-	return &opts, nil
+	return cfg, nil
 }
 
-func WithHttpServerListenAddr(a string) Option {
-	return func(o *options) error {
-		o.httpServerListenAddr = a
+func WithHttpServerListenAddr(addr string) option {
+	return func(cfg *config) error {
+		cfg.httpServerListenAddr = addr
 		return nil
 	}
 }
