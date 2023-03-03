@@ -16,12 +16,16 @@ func main() {
 
 	// TODO: add flags for all options eventually.
 	httpListenAddr := flag.String("httpListenAddr", "0.0.0.0:8080", "The HTTP server listen address in address:port format.")
-	dbDSN := flag.String("dbDSN", "", "The database Data Source Name.")
+	dbDSN := flag.String("dbDSN", "", "The database Data Source Name. Alternatively, it may be specified via LASSIE_EVENT_RECORDER_DB_DSN environment variable. If both are present, the environment variable takes precedence.")
 	logLevel := flag.String("logLevel", "info", "The logging level. Only applied if GOLOG_LOG_LEVEL environment variable is unset.")
 	flag.Parse()
 
 	if _, set := os.LookupEnv("GOLOG_LOG_LEVEL"); !set {
 		_ = log.SetLogLevel("*", *logLevel)
+	}
+
+	if v, set := os.LookupEnv("LASSIE_EVENT_RECORDER_DB_DSN"); set {
+		dbDSN = &v
 	}
 
 	r, err := eventrecorder.NewEventRecorder(
