@@ -65,6 +65,7 @@ func (r *EventRecorder) Start(ctx context.Context) error {
 func (r *EventRecorder) httpServerMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/retrieval-events", r.handleRetrievalEvents)
+	mux.HandleFunc("/ready", r.handleReady)
 	return mux
 }
 
@@ -146,6 +147,16 @@ func (r *EventRecorder) handleRetrievalEvents(res http.ResponseWriter, req *http
 		return
 	} else {
 		logger.Infow("Successfully submitted batch event insertion")
+	}
+}
+
+func (r *EventRecorder) handleReady(res http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		// TODO: ping DB as part of readiness check?
+		res.Header().Add("Allow", http.MethodGet)
+	default:
+		http.Error(res, "", http.StatusMethodNotAllowed)
 	}
 }
 
