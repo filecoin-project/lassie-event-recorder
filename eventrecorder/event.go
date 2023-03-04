@@ -37,7 +37,7 @@ func init() {
 	errInvalidEventCode = fmt.Errorf("eventName must be one of: %v", codes)
 }
 
-type event struct {
+type Event struct {
 	RetrievalId       types.RetrievalID `json:"retrievalId"`
 	InstanceId        string            `json:"instanceId,omitempty"`
 	Cid               string            `json:"cid"`
@@ -49,7 +49,7 @@ type event struct {
 	EventDetails      any               `json:"eventDetails,omitempty"`
 }
 
-func (e event) validate() error {
+func (e Event) Validate() error {
 	switch {
 	case e.RetrievalId == emptyRetrievalID:
 		return errors.New("property retrievalId is required")
@@ -101,16 +101,16 @@ func validEventCode(code types.EventCode) bool {
 	return ok
 }
 
-type eventBatch struct {
-	Events []event `json:"events"`
+type EventBatch struct {
+	Events []Event `json:"events"`
 }
 
-func (e eventBatch) validate() error {
+func (e EventBatch) Validate() error {
 	if len(e.Events) == 0 {
 		return errors.New("property events is required")
 	}
 	for _, event := range e.Events {
-		if err := event.validate(); err != nil {
+		if err := event.Validate(); err != nil {
 			return err
 		}
 	}
