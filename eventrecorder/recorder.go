@@ -22,7 +22,7 @@ type EventRecorder struct {
 	db     *pgxpool.Pool
 }
 
-func NewEventRecorder(opts ...Option) (*EventRecorder, error) {
+func New(opts ...option) (*EventRecorder, error) {
 	cfg, err := newConfig(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply option: %w", err)
@@ -87,7 +87,7 @@ func (r *EventRecorder) handleRetrievalEvents(res http.ResponseWriter, req *http
 	}
 
 	// Decode JSON body
-	var batch eventBatch
+	var batch EventBatch
 	if err := json.NewDecoder(req.Body).Decode(&batch); err != nil {
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		logger.Warn("Rejected bad request with undecodable json body")
@@ -95,7 +95,7 @@ func (r *EventRecorder) handleRetrievalEvents(res http.ResponseWriter, req *http
 	}
 
 	// Validate JSON
-	if err := batch.validate(); err != nil {
+	if err := batch.Validate(); err != nil {
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		logger.Warn("Rejected bad request with invalid event")
 		return
@@ -143,7 +143,7 @@ func (r *EventRecorder) handleRetrievalEvents(res http.ResponseWriter, req *http
 	batchResult := r.db.SendBatch(ctx, &batchQuery)
 	if err := batchResult.Close(); err != nil {
 		http.Error(res, "", http.StatusInternalServerError)
-		logger.Infow("At least one retrieval event insertion failed", "err", err)
+		logger.Errorw("At least one retrieval event insertion failed", "err", err)
 		return
 	} else {
 		logger.Infow("Successfully submitted batch event insertion")

@@ -113,15 +113,15 @@ func Test_EventValidate(t *testing.T) {
 			require.NoError(t, err)
 
 			var subject interface {
-				validate() error
+				Validate() error
 			}
 			var gotDecodeErr error
 			if test.batch {
-				var eb eventBatch
+				var eb EventBatch
 				gotDecodeErr = json.Unmarshal(given, &eb)
 				subject = eb
 			} else {
-				var e event
+				var e Event
 				gotDecodeErr = json.Unmarshal(given, &e)
 				subject = e
 			}
@@ -130,7 +130,7 @@ func Test_EventValidate(t *testing.T) {
 				require.NotNil(t, gotDecodeErr)
 			} else {
 				require.NoError(t, gotDecodeErr)
-				if gotErr := subject.validate(); test.wantValidationErr {
+				if gotErr := subject.Validate(); test.wantValidationErr {
 					require.NotNil(t, gotErr)
 				} else {
 					require.NoError(t, gotErr)

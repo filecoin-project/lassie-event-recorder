@@ -28,7 +28,7 @@ func main() {
 		dbDSN = &v
 	}
 
-	r, err := eventrecorder.NewEventRecorder(
+	r, err := eventrecorder.New(
 		eventrecorder.WithHttpServerListenAddr(*httpListenAddr),
 		eventrecorder.WithDatabaseDSN(*dbDSN),
 	)

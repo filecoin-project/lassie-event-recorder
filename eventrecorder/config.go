@@ -21,10 +21,10 @@ type (
 		// pgxPoolConfig is instantiated by parsing config.dbDSN.
 		pgxPoolConfig *pgxpool.Config
 	}
-	Option func(*config) error
+	option func(*config) error
 )
 
-func newConfig(opts []Option) (*config, error) {
+func newConfig(opts []option) (*config, error) {
 	cfg := &config{
 		httpServerListenAddr:        "0.0.0.0:8080",
 		httpServerReadTimeout:       5 * time.Second,
@@ -49,14 +49,14 @@ func newConfig(opts []Option) (*config, error) {
 	return cfg, nil
 }
 
-func WithHttpServerListenAddr(addr string) Option {
+func WithHttpServerListenAddr(addr string) option {
 	return func(cfg *config) error {
 		cfg.httpServerListenAddr = addr
 		return nil
 	}
 }
 
-func WithDatabaseDSN(url string) Option {
+func WithDatabaseDSN(url string) option {
 	return func(cfg *config) error {
 		cfg.dbDSN = url
 		return nil
