@@ -57,8 +57,6 @@ func (e Event) Validate() error {
 		return errors.New("property instanceId is required")
 	case e.Cid == "":
 		return errors.New("property cid is required")
-	case e.StorageProviderId == "":
-		return errors.New("property storageProviderId is required")
 	case e.Phase == "":
 		return errors.New("property phase is required")
 	case !validPhase(e.Phase):
@@ -80,8 +78,10 @@ func (e Event) Validate() error {
 		if err != nil {
 			return fmt.Errorf("cid must be valid: %w", err)
 		}
-		if _, err := peer.Decode(e.StorageProviderId); err != nil {
-			return fmt.Errorf("storageProviderId must be valid: %w", err)
+		if e.StorageProviderId != "" {
+			if _, err := peer.Decode(e.StorageProviderId); err != nil {
+				return fmt.Errorf("storageProviderId must be valid: %w", err)
+			}
 		}
 		return nil
 	}
