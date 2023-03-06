@@ -9,6 +9,16 @@
       "phaseStartTime": "2023-03-02T00:15:50.479910907Z",
       "eventName": "started",
       "eventTime": "2023-03-02T00:15:52.361371026Z"
+    },
+    {
+      "retrievalId": "d05a522e-9608-401a-a33f-1eb4ac4111a0",
+      "instanceId": "test-instance-id",
+      "cid": "bafybeic4jpi2detp5n3q6rjo7ckulebtr7dsvt2tbrtcqlnnzqmi3bzz2y",
+      "storageProviderId": "",
+      "phase": "indexer",
+      "phaseStartTime": "2023-03-02T00:15:50.479910907Z",
+      "eventName": "started",
+      "eventTime": "2023-03-02T00:15:52.361371026Z"
     }
   ]
 }

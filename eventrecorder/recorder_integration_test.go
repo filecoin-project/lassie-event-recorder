@@ -89,9 +89,31 @@ func TestPostEvent(t *testing.T) {
 
 	var wantEventBatch eventrecorder.EventBatch
 	require.NoError(t, json.Unmarshal(encEventBatch, &wantEventBatch))
-	require.Len(t, wantEventBatch.Events, 1)
+	require.Len(t, wantEventBatch.Events, 2)
 	wantEvent := wantEventBatch.Events[0]
 
+	require.Equal(t, [16]byte(wantEvent.RetrievalId), e.RetrievalId.Bytes)
+	require.Equal(t, wantEvent.InstanceId, e.InstanceId)
+	require.Equal(t, wantEvent.Cid, e.Cid)
+	require.Equal(t, wantEvent.StorageProviderId, e.StorageProviderId)
+	require.Equal(t, wantEvent.Phase, e.Phase)
+	require.Equal(t, wantEvent.PhaseStartTime.UnixMicro(), e.PhaseStartTime.UnixMicro())
+	require.Equal(t, wantEvent.EventName, e.EventName)
+	require.Equal(t, wantEvent.EventTime.UnixMicro(), e.EventTime.UnixMicro())
+
+	require.True(t, rows.Next())
+	require.NoError(t, rows.Scan(
+		&e.RetrievalId,
+		&e.InstanceId,
+		&e.Cid,
+		&e.StorageProviderId,
+		&e.Phase,
+		&e.PhaseStartTime,
+		&e.EventName,
+		&e.EventTime,
+	))
+
+	wantEvent = wantEventBatch.Events[1]
 	require.Equal(t, [16]byte(wantEvent.RetrievalId), e.RetrievalId.Bytes)
 	require.Equal(t, wantEvent.InstanceId, e.InstanceId)
 	require.Equal(t, wantEvent.Cid, e.Cid)
