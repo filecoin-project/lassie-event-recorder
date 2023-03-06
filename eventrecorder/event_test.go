@@ -60,12 +60,6 @@ func Test_EventValidate(t *testing.T) {
 			wantValidationErr: true,
 		},
 		{
-			name:              "invalid-provider-id",
-			path:              "../testdata/invalid-providerid.json",
-			batch:             true,
-			wantValidationErr: true,
-		},
-		{
 			name:              "missing-events",
 			path:              "../testdata/missing-events.json",
 			batch:             true,

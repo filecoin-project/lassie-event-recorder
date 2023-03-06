@@ -7,7 +7,6 @@ import (
 
 	"github.com/filecoin-project/lassie/pkg/types"
 	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 var (
@@ -77,11 +76,6 @@ func (e Event) Validate() error {
 		_, err := cid.Decode(e.Cid)
 		if err != nil {
 			return fmt.Errorf("cid must be valid: %w", err)
-		}
-		if e.StorageProviderId != "" {
-			if _, err := peer.Decode(e.StorageProviderId); err != nil {
-				return fmt.Errorf("storageProviderId must be valid: %w", err)
-			}
 		}
 		return nil
 	}
