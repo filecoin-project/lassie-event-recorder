@@ -97,7 +97,7 @@ func (r *EventRecorder) handleRetrievalEvents(res http.ResponseWriter, req *http
 	// Validate JSON
 	if err := batch.Validate(); err != nil {
 		http.Error(res, err.Error(), http.StatusBadRequest)
-		logger.Warn("Rejected bad request with invalid event")
+		logger.Warnf("Rejected bad request with invalid event: %s", err.Error())
 		return
 	}
 
