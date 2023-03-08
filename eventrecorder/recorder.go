@@ -8,10 +8,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/filecoin-project/lassie/pkg/metrics"
+	"github.com/filecoin-project/lassie/pkg/types"
 	"github.com/ipfs/go-log/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opencensus.io/stats"
 )
 
 var logger = log.Logger("lassie/eventrecorder")
@@ -66,7 +69,8 @@ func (r *EventRecorder) httpServerMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/retrieval-events", r.handleRetrievalEvents)
 	mux.HandleFunc("/ready", r.handleReady)
-	mux.HandleFunc("/v1/summarize-and-clear", r.handleStats)
+	// register prometheus metrics
+	mux.Handle("/metrics", metrics.NewExporter())
 	return mux
 }
 
@@ -147,87 +151,10 @@ func (r *EventRecorder) handleRetrievalEvents(res http.ResponseWriter, req *http
 		logger.Errorw("At least one retrieval event insertion failed", "err", err)
 		return
 	}
+	for _, event := range batch.Events {
+		recordMetrics(event)
+	}
 	logger.Infow("Successfully submitted batch event insertion")
-}
-
-type EventSummary struct {
-	TotalAttempts              uint64    `json:"totalAttempts"`
-	AttemptedBitswap           uint64    `json:"attemptedBitswap"`
-	AttemptedGraphSync         uint64    `json:"attemptedGraphSync"`
-	AttemptedBoth              uint64    `json:"attemptedBoth"`
-	AttemptedEither            uint64    `json:"attemptedEither"`
-	BitswapSuccesses           uint64    `json:"bitswapSuccesses"`
-	GraphSyncSuccesses         uint64    `json:"graphSyncSuccesses"`
-	AvgBandwidth               *float64  `json:"avgBandwidth"`
-	FirstByte                  []float64 `json:"firstByte"`
-	DownloadSize               []float64 `json:"downloadSize"`
-	GraphsyncAttemptsPastQuery uint64    `json:"graphsyncAttemptsPastQuery"`
-}
-
-func (r *EventRecorder) handleStats(res http.ResponseWriter, req *http.Request) {
-	logger := logger.With("method", req.Method, "path", req.URL.Path)
-	if req.Method != http.MethodGet {
-		res.Header().Add("Allow", http.MethodGet)
-		http.Error(res, "", http.StatusMethodNotAllowed)
-		logger.Warn("Rejected disallowed method")
-		return
-	}
-
-	ctx := req.Context()
-	runQuery := `
-	select count(all_attempts.retrieval_id) as total_attempts, 
-  count(bitswap_retrievals.retrieval_id) as attempted_bitswap, 
-  count(graphsync_retrievals.retrieval_id) as attempted_graphsync, 
-  sum(case when bitswap_retrievals.retrieval_id IS NOT NULL and graphsync_retrievals.retrieval_id IS NOT NULL then 1 else 0 end) as attempted_both,
-  sum(case when bitswap_retrievals.retrieval_id IS NOT NULL or graphsync_retrievals.retrieval_id IS NOT NULL then 1 else 0 end) as attempted_either,
-  sum(case when successful_retrievals.storage_provider_id = 'Bitswap' then 1 else 0 end) as bitswap_successes,
-  sum(case when successful_retrievals.storage_provider_id <> 'Bitswap' and successful_retrievals.retrieval_id IS NOT NULL then 1 else 0 end) as graphsync_successes,
-  case when extract('epoch' from sum(successful_retrievals.event_time - first_byte_retrievals.event_time)) = 0 then 0 else sum(successful_retrievals.received_size)::float / extract('epoch' from sum(successful_retrievals.event_time - first_byte_retrievals.event_time))::float end as avg_bandwidth,
-  percentile_cont('{0.5, 0.9, 0.95}'::double precision[]) WITHIN GROUP (ORDER BY (extract ('epoch' from first_byte_retrievals.event_time - all_attempts.event_time))) as p50_p90_p95_first_byte,
-  percentile_cont('{0.5, 0.9, 0.95}'::double precision[]) WITHIN GROUP (ORDER BY (successful_retrievals.received_size)) as p50_p90_p95_download_size,
-	count(graphsync_retrieval_attempts.retrieval_id) as graphsync_retrieval_attempts_past_query
-  from (
-    select distinct on (retrieval_id) retrieval_id, event_time from retrieval_events order by retrieval_id, event_time
-    ) as all_attempts left join (
-      select distinct retrieval_id from retrieval_events where storage_provider_id = 'Bitswap'
-      ) as bitswap_retrievals on all_attempts.retrieval_id = bitswap_retrievals.retrieval_id left join (
-        select distinct retrieval_id from retrieval_events where storage_provider_id <> 'Bitswap' and phase <> 'indexer'
-        ) as graphsync_retrievals on graphsync_retrievals.retrieval_id = all_attempts.retrieval_id left join (
-          select distinct on (retrieval_id) retrieval_id, event_time, storage_provider_id, (event_details ->	'receivedSize')::int8 as received_size from retrieval_events where event_name = 'success' order by retrieval_id, event_time
-        ) as successful_retrievals on  successful_retrievals.retrieval_id = all_attempts.retrieval_id left join (
-          select retrieval_id, event_time, storage_provider_id from retrieval_events where event_name = 'first-byte-received'
-        ) as first_byte_retrievals on successful_retrievals.retrieval_id = first_byte_retrievals.retrieval_id and successful_retrievals.storage_provider_id = first_byte_retrievals.storage_provider_id left join (
-					select distinct retrieval_id from retrieval_events where storage_provider_id <> 'Bitswap' and phase = 'retrieval'
-        ) as graphsync_retrieval_attempts on graphsync_retrievals.retrieval_id = graphsync_retrieval_attempts.retrieval_id
-	`
-
-	row := r.db.QueryRow(ctx, runQuery)
-	var summary EventSummary
-	err := row.Scan(&summary.TotalAttempts,
-		&summary.AttemptedBitswap,
-		&summary.AttemptedGraphSync,
-		&summary.AttemptedBoth,
-		&summary.AttemptedEither,
-		&summary.BitswapSuccesses,
-		&summary.GraphSyncSuccesses,
-		&summary.AvgBandwidth,
-		&summary.FirstByte,
-		&summary.DownloadSize,
-		&summary.GraphsyncAttemptsPastQuery)
-	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
-		logger.Errorw("Failure to execute query", "err", err)
-		return
-	}
-	err = json.NewEncoder(res).Encode(summary)
-	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
-		logger.Errorw("failed encoding result", "err", err)
-		return
-	}
-
-	r.db.Exec(ctx, "TRUNCATE TABLE retrieval_events")
-	logger.Infow("Successfully ran summary and cleared DB")
 }
 
 func (r *EventRecorder) handleReady(res http.ResponseWriter, req *http.Request) {
@@ -242,4 +169,110 @@ func (r *EventRecorder) handleReady(res http.ResponseWriter, req *http.Request) 
 
 func (r *EventRecorder) Shutdown(ctx context.Context) error {
 	return r.server.Shutdown(ctx)
+}
+
+// Implement RetrievalSubscriber
+func recordMetrics(event Event) {
+	switch event.EventName {
+	case types.CandidatesFoundCode:
+		handleCandidatesFoundEvent(event)
+	case types.CandidatesFilteredCode:
+		handleCandidatesFilteredEvent(event)
+	case types.StartedCode:
+		handleStartedEvent(event)
+	case types.FailedCode:
+		handleFailureEvent(event)
+	case types.QueryAskedCode: // query-ask success
+		handleQueryAskEvent()
+	case types.QueryAskedFilteredCode:
+		handleQueryAskFilteredEvent()
+	}
+}
+
+func handleQueryAskFilteredEvent() {
+	stats.Record(context.Background(), metrics.RequestWithSuccessfulQueriesFilteredCount.M(1))
+}
+
+func handleQueryAskEvent() {
+	stats.Record(context.Background(), metrics.RequestWithSuccessfulQueriesCount.M(1))
+}
+
+// handleFailureEvent is called when a query _or_ retrieval fails
+func handleFailureEvent(event Event) {
+
+	detailsObj, ok := event.EventDetails.(map[string]interface{})
+	if !ok {
+		return
+	}
+	msg, ok := detailsObj["Error"].(string)
+	if !ok {
+		return
+	}
+	switch event.Phase {
+	case types.QueryPhase:
+		var matched bool
+		for substr, metric := range metrics.QueryErrorMetricMatches {
+			if strings.Contains(msg, substr) {
+				stats.Record(context.Background(), metric.M(1))
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			stats.Record(context.Background(), metrics.QueryErrorOtherCount.M(1))
+		}
+	case types.RetrievalPhase:
+		stats.Record(context.Background(), metrics.RetrievalDealFailCount.M(1))
+		stats.Record(context.Background(), metrics.RetrievalDealActiveCount.M(-1))
+
+		var matched bool
+		for substr, metric := range metrics.ErrorMetricMatches {
+			if strings.Contains(msg, substr) {
+				stats.Record(context.Background(), metric.M(1))
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			stats.Record(context.Background(), metrics.RetrievalErrorOtherCount.M(1))
+		}
+	}
+}
+
+func handleStartedEvent(event Event) {
+	if event.Phase == types.RetrievalPhase {
+		stats.Record(context.Background(), metrics.RetrievalRequestCount.M(1))
+		stats.Record(context.Background(), metrics.RetrievalDealActiveCount.M(1))
+	}
+}
+
+func handleCandidatesFilteredEvent(event Event) {
+	detailsObj, ok := event.EventDetails.(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	candidateCount, ok := detailsObj["CandidateCount"].(float64)
+	if !ok {
+		return
+	}
+	if candidateCount > 0 {
+		stats.Record(context.Background(), metrics.RequestWithIndexerCandidatesFilteredCount.M(1))
+	}
+}
+
+func handleCandidatesFoundEvent(event Event) {
+	detailsObj, ok := event.EventDetails.(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	candidateCount, ok := detailsObj["CandidateCount"].(float64)
+	if !ok {
+		return
+	}
+	if candidateCount > 0 {
+		stats.Record(context.Background(), metrics.RequestWithIndexerCandidatesCount.M(1))
+	}
+	stats.Record(context.Background(), metrics.IndexerCandidatesPerRequestCount.M(int64(candidateCount)))
 }
