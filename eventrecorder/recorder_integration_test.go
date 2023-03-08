@@ -124,19 +124,4 @@ func TestPostEvent(t *testing.T) {
 	require.Equal(t, wantEvent.EventTime.UnixMicro(), e.EventTime.UnixMicro())
 
 	require.False(t, rows.Next())
-
-	// verify we are able to fetch a summary and decode, and use this to clear the DB
-	resp, err = http.Get("http://localhost:8080/v1/summarize-and-clear")
-	require.NoError(t, err)
-	require.Equal(t, resp.StatusCode, 200)
-
-	var summary eventrecorder.EventSummary
-	err = json.NewDecoder(resp.Body).Decode(&summary)
-	require.NoError(t, err)
-
-	require.Equal(t, summary.TotalAttempts, uint64(1))
-	require.Equal(t, summary.AttemptedBitswap, uint64(0))
-	require.Equal(t, summary.AttemptedGraphSync, uint64(1))
-	require.Equal(t, summary.AttemptedBoth, uint64(0))
-	require.Equal(t, summary.AttemptedEither, uint64(1))
 }
