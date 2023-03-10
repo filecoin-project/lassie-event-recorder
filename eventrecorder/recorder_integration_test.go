@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/lassie-event-recorder/eventrecorder"
+	"github.com/filecoin-project/lassie-event-recorder/statsrunner"
 	"github.com/filecoin-project/lassie/pkg/types"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -125,18 +126,18 @@ func TestPostEvent(t *testing.T) {
 
 	require.False(t, rows.Next())
 
-	// verify we are able to fetch a summary and decode, and use this to clear the DB
-	resp, err = http.Get("http://localhost:8080/v1/summarize-and-clear")
+	statsRunner, err := statsrunner.New(dbdsn)
 	require.NoError(t, err)
-	require.Equal(t, resp.StatusCode, 200)
-
-	var summary eventrecorder.EventSummary
-	err = json.NewDecoder(resp.Body).Decode(&summary)
+	err = statsRunner.Start(ctx)
 	require.NoError(t, err)
 
+	summary, err := statsRunner.GetEventSummary(ctx)
+	require.NoError(t, err)
 	require.Equal(t, summary.TotalAttempts, uint64(1))
 	require.Equal(t, summary.AttemptedBitswap, uint64(0))
 	require.Equal(t, summary.AttemptedGraphSync, uint64(1))
 	require.Equal(t, summary.AttemptedBoth, uint64(0))
 	require.Equal(t, summary.AttemptedEither, uint64(1))
+
+	statsRunner.Close()
 }
