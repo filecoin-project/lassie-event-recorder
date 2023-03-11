@@ -142,7 +142,7 @@ func (m *Metrics) Start() error {
 	// funnel
 
 	if m.totalRequestCount, err = meter.Int64Counter("total_request_count",
-		instrument.WithDescription("distinc retrievals sent to Lassie on Saturn"),
+		instrument.WithDescription("distinct retrievals sent to Lassie on Saturn"),
 	); err != nil {
 		return err
 	}
