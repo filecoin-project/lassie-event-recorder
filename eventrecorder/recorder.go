@@ -8,21 +8,21 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/filecoin-project/lassie/pkg/metrics"
+	"github.com/filecoin-project/lassie-event-recorder/metrics"
 	"github.com/filecoin-project/lassie/pkg/types"
 	"github.com/ipfs/go-log/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"go.opencensus.io/stats"
 )
 
 var logger = log.Logger("lassie/eventrecorder")
 
 type EventRecorder struct {
-	cfg    *config
-	server *http.Server
-	db     *pgxpool.Pool
+	cfg     *config
+	server  *http.Server
+	db      *pgxpool.Pool
+	metrics *metrics.Metrics
 }
 
 func New(opts ...option) (*EventRecorder, error) {
@@ -69,8 +69,6 @@ func (r *EventRecorder) httpServerMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/retrieval-events", r.handleRetrievalEvents)
 	mux.HandleFunc("/ready", r.handleReady)
-	// register prometheus metrics
-	mux.Handle("/metrics", metrics.NewExporter())
 	return mux
 }
 
@@ -151,8 +149,23 @@ func (r *EventRecorder) handleRetrievalEvents(res http.ResponseWriter, req *http
 		logger.Errorw("At least one retrieval event insertion failed", "err", err)
 		return
 	}
-	for _, event := range batch.Events {
-		recordMetrics(event)
+	if r.metrics != nil {
+		for _, event := range batch.Events {
+			switch event.EventName {
+			case types.StartedCode:
+				r.metrics.HandleStartedEvent(ctx, event.RetrievalId, event.Phase, event.EventTime, event.StorageProviderId)
+			case types.CandidatesFoundCode:
+				r.metrics.HandleCandidatesFoundEvent(ctx, event.RetrievalId, event.EventTime, event.EventDetails)
+			case types.CandidatesFilteredCode:
+				r.metrics.HandleCandidatesFilteredEvent(ctx, event.RetrievalId, event.EventDetails)
+			case types.FailedCode:
+				r.metrics.HandleFailureEvent(ctx, event.RetrievalId, event.Phase, event.EventDetails)
+			case types.FirstByteCode:
+				r.metrics.HandleTimeToFirstByteEvent(ctx, event.RetrievalId, event.EventTime)
+			case types.SuccessCode:
+				r.metrics.HandleSuccessEvent(ctx, event.RetrievalId, event.EventTime, event.StorageProviderId, event.EventDetails)
+			}
+		}
 	}
 	logger.Infow("Successfully submitted batch event insertion")
 }
@@ -169,110 +182,4 @@ func (r *EventRecorder) handleReady(res http.ResponseWriter, req *http.Request) 
 
 func (r *EventRecorder) Shutdown(ctx context.Context) error {
 	return r.server.Shutdown(ctx)
-}
-
-// Implement RetrievalSubscriber
-func recordMetrics(event Event) {
-	switch event.EventName {
-	case types.CandidatesFoundCode:
-		handleCandidatesFoundEvent(event)
-	case types.CandidatesFilteredCode:
-		handleCandidatesFilteredEvent(event)
-	case types.StartedCode:
-		handleStartedEvent(event)
-	case types.FailedCode:
-		handleFailureEvent(event)
-	case types.QueryAskedCode: // query-ask success
-		handleQueryAskEvent()
-	case types.QueryAskedFilteredCode:
-		handleQueryAskFilteredEvent()
-	}
-}
-
-func handleQueryAskFilteredEvent() {
-	stats.Record(context.Background(), metrics.RequestWithSuccessfulQueriesFilteredCount.M(1))
-}
-
-func handleQueryAskEvent() {
-	stats.Record(context.Background(), metrics.RequestWithSuccessfulQueriesCount.M(1))
-}
-
-// handleFailureEvent is called when a query _or_ retrieval fails
-func handleFailureEvent(event Event) {
-
-	detailsObj, ok := event.EventDetails.(map[string]interface{})
-	if !ok {
-		return
-	}
-	msg, ok := detailsObj["Error"].(string)
-	if !ok {
-		return
-	}
-	switch event.Phase {
-	case types.QueryPhase:
-		var matched bool
-		for substr, metric := range metrics.QueryErrorMetricMatches {
-			if strings.Contains(msg, substr) {
-				stats.Record(context.Background(), metric.M(1))
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			stats.Record(context.Background(), metrics.QueryErrorOtherCount.M(1))
-		}
-	case types.RetrievalPhase:
-		stats.Record(context.Background(), metrics.RetrievalDealFailCount.M(1))
-		stats.Record(context.Background(), metrics.RetrievalDealActiveCount.M(-1))
-
-		var matched bool
-		for substr, metric := range metrics.ErrorMetricMatches {
-			if strings.Contains(msg, substr) {
-				stats.Record(context.Background(), metric.M(1))
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			stats.Record(context.Background(), metrics.RetrievalErrorOtherCount.M(1))
-		}
-	}
-}
-
-func handleStartedEvent(event Event) {
-	if event.Phase == types.RetrievalPhase {
-		stats.Record(context.Background(), metrics.RetrievalRequestCount.M(1))
-		stats.Record(context.Background(), metrics.RetrievalDealActiveCount.M(1))
-	}
-}
-
-func handleCandidatesFilteredEvent(event Event) {
-	detailsObj, ok := event.EventDetails.(map[string]interface{})
-	if !ok {
-		return
-	}
-
-	candidateCount, ok := detailsObj["CandidateCount"].(float64)
-	if !ok {
-		return
-	}
-	if candidateCount > 0 {
-		stats.Record(context.Background(), metrics.RequestWithIndexerCandidatesFilteredCount.M(1))
-	}
-}
-
-func handleCandidatesFoundEvent(event Event) {
-	detailsObj, ok := event.EventDetails.(map[string]interface{})
-	if !ok {
-		return
-	}
-
-	candidateCount, ok := detailsObj["CandidateCount"].(float64)
-	if !ok {
-		return
-	}
-	if candidateCount > 0 {
-		stats.Record(context.Background(), metrics.RequestWithIndexerCandidatesCount.M(1))
-	}
-	stats.Record(context.Background(), metrics.IndexerCandidatesPerRequestCount.M(int64(candidateCount)))
 }
