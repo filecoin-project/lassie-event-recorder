@@ -9,7 +9,7 @@ import (
 	"go.opentelemetry.io/otel/metric/instrument"
 )
 
-// handleFailureEvent is called when a query _or_ retrieval fails
+// HandleFailureEvent is called when a query _or_ retrieval fails
 func (m *Metrics) HandleFailureEvent(ctx context.Context, id types.RetrievalID, phase types.Phase, details interface{}) {
 
 	detailsObj, ok := details.(map[string]interface{})
