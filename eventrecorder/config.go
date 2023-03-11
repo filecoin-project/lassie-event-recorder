@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/lassie-event-recorder/metrics"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,6 +21,8 @@ type (
 		dbDSN string
 		// pgxPoolConfig is instantiated by parsing config.dbDSN.
 		pgxPoolConfig *pgxpool.Config
+
+		metrics *metrics.Metrics
 	}
 	option func(*config) error
 )
@@ -59,6 +62,13 @@ func WithHttpServerListenAddr(addr string) option {
 func WithDatabaseDSN(url string) option {
 	return func(cfg *config) error {
 		cfg.dbDSN = url
+		return nil
+	}
+}
+
+func WithMetrics(metrics *metrics.Metrics) option {
+	return func(cfg *config) error {
+		cfg.metrics = metrics
 		return nil
 	}
 }
