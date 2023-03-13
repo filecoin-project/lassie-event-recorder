@@ -12,7 +12,6 @@ const timeout = 1 * time.Minute
 
 type TempData struct {
 	timer                           *time.Timer
-	lastStage                       uint32
 	startTime                       uint64
 	indexerCandidates               uint32
 	indexerCandidateFirstResultTime uint64
