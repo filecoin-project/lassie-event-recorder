@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/filecoin-project/lassie-event-recorder/metrics"
 	"github.com/filecoin-project/lassie/pkg/types"
 	"github.com/ipfs/go-log/v2"
 	"github.com/jackc/pgx/v5"
@@ -19,10 +18,9 @@ import (
 var logger = log.Logger("lassie/eventrecorder")
 
 type EventRecorder struct {
-	cfg     *config
-	server  *http.Server
-	db      *pgxpool.Pool
-	metrics *metrics.Metrics
+	cfg    *config
+	server *http.Server
+	db     *pgxpool.Pool
 }
 
 func New(opts ...option) (*EventRecorder, error) {
@@ -149,21 +147,21 @@ func (r *EventRecorder) handleRetrievalEvents(res http.ResponseWriter, req *http
 		logger.Errorw("At least one retrieval event insertion failed", "err", err)
 		return
 	}
-	if r.metrics != nil {
+	if r.cfg.metrics != nil {
 		for _, event := range batch.Events {
 			switch event.EventName {
 			case types.StartedCode:
-				r.metrics.HandleStartedEvent(ctx, event.RetrievalId, event.Phase, event.EventTime, event.StorageProviderId)
+				r.cfg.metrics.HandleStartedEvent(ctx, event.RetrievalId, event.Phase, event.EventTime, event.StorageProviderId)
 			case types.CandidatesFoundCode:
-				r.metrics.HandleCandidatesFoundEvent(ctx, event.RetrievalId, event.EventTime, event.EventDetails)
+				r.cfg.metrics.HandleCandidatesFoundEvent(ctx, event.RetrievalId, event.EventTime, event.EventDetails)
 			case types.CandidatesFilteredCode:
-				r.metrics.HandleCandidatesFilteredEvent(ctx, event.RetrievalId, event.EventDetails)
+				r.cfg.metrics.HandleCandidatesFilteredEvent(ctx, event.RetrievalId, event.EventDetails)
 			case types.FailedCode:
-				r.metrics.HandleFailureEvent(ctx, event.RetrievalId, event.Phase, event.EventDetails)
+				r.cfg.metrics.HandleFailureEvent(ctx, event.RetrievalId, event.Phase, event.EventDetails)
 			case types.FirstByteCode:
-				r.metrics.HandleTimeToFirstByteEvent(ctx, event.RetrievalId, event.EventTime)
+				r.cfg.metrics.HandleTimeToFirstByteEvent(ctx, event.RetrievalId, event.EventTime)
 			case types.SuccessCode:
-				r.metrics.HandleSuccessEvent(ctx, event.RetrievalId, event.EventTime, event.StorageProviderId, event.EventDetails)
+				r.cfg.metrics.HandleSuccessEvent(ctx, event.RetrievalId, event.EventTime, event.StorageProviderId, event.EventDetails)
 			}
 		}
 	}
