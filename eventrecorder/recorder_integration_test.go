@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/lassie-event-recorder/eventrecorder"
+	"github.com/filecoin-project/lassie-event-recorder/httpserver"
 	"github.com/filecoin-project/lassie/pkg/types"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,7 +20,7 @@ import (
 )
 
 func TestPostEvent(t *testing.T) {
-	var dbdsn = "postgres://postgres:postgres@localhost:5432/SaturnLassieEvents"
+	var dbdsn = "postgres://user:passwd@localhost:5432/LassieEvents"
 	if v, ok := os.LookupEnv("LASSIE_EVENT_RECORDER_DB_DSN"); ok {
 		dbdsn = v
 	}
@@ -34,13 +35,17 @@ func TestPostEvent(t *testing.T) {
 	_, err = db.Exec(ctx, string(schema))
 	require.NoError(t, err)
 
-	subject, err := eventrecorder.New(
+	recorder, err := eventrecorder.New(
 		eventrecorder.WithDatabaseDSN(dbdsn),
 	)
 	require.NoError(t, err)
-	require.NoError(t, subject.Start(ctx))
+
+	server, err := httpserver.NewHttpServer(recorder)
+	require.NoError(t, err)
+
+	require.NoError(t, server.Start(ctx))
 	defer func() {
-		require.NoError(t, subject.Shutdown(ctx))
+		server.Shutdown(ctx)
 	}()
 
 	encEventBatch, err := os.ReadFile("../testdata/good.json")
