@@ -3,7 +3,6 @@ package eventrecorder
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/filecoin-project/lassie-event-recorder/metrics"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -11,13 +10,6 @@ import (
 
 type (
 	config struct {
-		httpServerListenAddr        string
-		httpServerReadTimeout       time.Duration
-		httpServerReadHeaderTimeout time.Duration
-		httpServerWriteTimeout      time.Duration
-		httpServerIdleTimeout       time.Duration
-		httpServerMaxHeaderBytes    int
-
 		dbDSN string
 		// pgxPoolConfig is instantiated by parsing config.dbDSN.
 		pgxPoolConfig *pgxpool.Config
@@ -28,14 +20,7 @@ type (
 )
 
 func newConfig(opts []option) (*config, error) {
-	cfg := &config{
-		httpServerListenAddr:        "0.0.0.0:8080",
-		httpServerReadTimeout:       5 * time.Second,
-		httpServerReadHeaderTimeout: 5 * time.Second,
-		httpServerWriteTimeout:      5 * time.Second,
-		httpServerIdleTimeout:       10 * time.Second,
-		httpServerMaxHeaderBytes:    2048,
-	}
+	cfg := &config{}
 	for _, opt := range opts {
 		if err := opt(cfg); err != nil {
 			return nil, err
@@ -50,13 +35,6 @@ func newConfig(opts []option) (*config, error) {
 		return nil, fmt.Errorf("unable to parse db URL: %w", err)
 	}
 	return cfg, nil
-}
-
-func WithHttpServerListenAddr(addr string) option {
-	return func(cfg *config) error {
-		cfg.httpServerListenAddr = addr
-		return nil
-	}
 }
 
 func WithDatabaseDSN(url string) option {

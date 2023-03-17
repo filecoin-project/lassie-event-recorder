@@ -110,3 +110,47 @@ func (e EventBatch) Validate() error {
 	}
 	return nil
 }
+
+type AggregateEvent struct {
+	RetrievalID       string    `json:"retrievalId"`                 // The unique ID of the retrieval
+	InstanceID        string    `json:"instanceId"`                  // The ID of the Lassie instance generating the event
+	StorageProviderID string    `json:"storageProviderId,omitempty"` // The ID of the storage provider that served the retrieval content
+	TimeToFirstByte   int64     `json:"timeToFirstByte,omitempty"`   // The time it took to receive the first byte in milliseconds
+	Bandwidth         uint64    `json:"bandwidth,omitempty"`         // The bandwidth of the retrieval in bytes per second
+	Success           bool      `json:"success"`                     // Wether or not the retreival ended with a success event
+	StartTime         time.Time `json:"startTime"`                   // The time the retrieval started
+	EndTime           time.Time `json:"endTime"`                     // The time the retrieval ended
+}
+
+func (e AggregateEvent) Validate() error {
+	switch {
+	case e.RetrievalID == "":
+		return errors.New("property retrievalId is required")
+	case e.InstanceID == "":
+		return errors.New("property instanceId is required")
+	case e.StartTime.IsZero():
+		return errors.New("property startTime is required")
+	case e.EndTime.IsZero():
+		return errors.New("property endTime is required")
+	case e.EndTime.Before(e.StartTime):
+		return errors.New("property endTime cannot be before startTime")
+	default:
+		return nil
+	}
+}
+
+type AggregateEventBatch struct {
+	Events []AggregateEvent `json:"events"`
+}
+
+func (e AggregateEventBatch) Validate() error {
+	if len(e.Events) == 0 {
+		return errors.New("property events is required")
+	}
+	for _, event := range e.Events {
+		if err := event.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
