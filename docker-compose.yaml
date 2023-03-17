@@ -47,7 +47,7 @@ services:
     environment:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=passwd
-      - POSTGRES_DB=my_db
+      - POSTGRES_DB=LassieEvents
     expose:
       - 5432
     ports:
@@ -61,7 +61,7 @@ services:
       dockerfile: Dockerfile
       context: .
     command:
-      - --dbDSN=postgres://user:passwd@postgres:5432/my_db
+      - --dbDSN=postgres://user:passwd@postgres:5432/LassieEvents
     expose:
       - 7777
     ports:

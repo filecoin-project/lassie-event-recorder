@@ -9,9 +9,9 @@ jobs:
       postgres:
         image: postgres
         env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: SaturnLassieEvents
+          POSTGRES_PASSWORD: passwd
+          POSTGRES_USER: user
+          POSTGRES_DB: LassieEvents
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
