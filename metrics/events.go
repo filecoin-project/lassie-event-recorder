@@ -114,8 +114,8 @@ func (m *Metrics) HandleCandidatesFilteredEvent(ctx context.Context, id types.Re
 func (m *Metrics) HandleTimeToFirstByteEvent(ctx context.Context, id types.RetrievalID, storageProviderId string, eventTime time.Time) {
 	tempData := m.tempDataMap.GetOrCreate(id)
 	if tempData.RecordTimeToFirstByte(eventTime) {
-		m.requestWithFirstByteReceivedCount.Add(ctx, 1, attribute.String("sp_id", storageProviderId), attribute.String("protocol", protocol(storageProviderId)))
-		m.timeToFirstByte.Record(ctx, eventTime.Sub(tempData.StartTime()).Seconds(), attribute.String("sp_id", storageProviderId), attribute.String("protocol", protocol(storageProviderId)))
+		m.requestWithFirstByteReceivedCount.Add(ctx, 1, attribute.String("protocol", protocol(storageProviderId)))
+		m.timeToFirstByte.Record(ctx, eventTime.Sub(tempData.StartTime()).Seconds(), attribute.String("protocol", protocol(storageProviderId)))
 	}
 }
 
@@ -141,10 +141,10 @@ func (m *Metrics) HandleSuccessEvent(ctx context.Context, id types.RetrievalID, 
 	}
 
 	// stats
-	m.retrievalDealDuration.Record(ctx, eventTime.Sub(finalDetails.StartTime).Seconds(), attribute.String("sp_id", storageProviderId), attribute.String("protocol", protocol(storageProviderId)))
-	m.retrievalDealSize.Record(ctx, int64(receivedSize), attribute.String("sp_id", storageProviderId), attribute.String("protocol", protocol(storageProviderId)))
+	m.retrievalDealDuration.Record(ctx, eventTime.Sub(finalDetails.StartTime).Seconds(), attribute.String("protocol", protocol(storageProviderId)))
+	m.retrievalDealSize.Record(ctx, int64(receivedSize), attribute.String("protocol", protocol(storageProviderId)))
 	transferDuration := eventTime.Sub(finalDetails.TimeToFirstByte).Seconds()
-	m.bandwidthBytesPerSecond.Record(ctx, int64(receivedSize/transferDuration), attribute.String("sp_id", storageProviderId), attribute.String("protocol", protocol(storageProviderId)))
+	m.bandwidthBytesPerSecond.Record(ctx, int64(receivedSize/transferDuration), attribute.String("protocol", protocol(storageProviderId)))
 
 	// averages
 	m.indexerCandidatesPerRequestCount.Record(ctx, int64(finalDetails.IndexerCandidates))
