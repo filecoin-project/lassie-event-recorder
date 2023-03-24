@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/lassie/pkg/types"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric/instrument"
 )
 
@@ -65,7 +66,7 @@ func (m *Metrics) HandleStartedEvent(ctx context.Context, id types.RetrievalID, 
 			}
 		} else {
 			if tempData.RecordGraphsyncAttempt() {
-				m.requestWithGraphSyncAttempt.Add(ctx, 1)
+				m.requestWithGraphSyncAttempt.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
 			}
 		}
 	}
@@ -110,11 +111,11 @@ func (m *Metrics) HandleCandidatesFilteredEvent(ctx context.Context, id types.Re
 	}
 }
 
-func (m *Metrics) HandleTimeToFirstByteEvent(ctx context.Context, id types.RetrievalID, eventTime time.Time) {
+func (m *Metrics) HandleTimeToFirstByteEvent(ctx context.Context, id types.RetrievalID, storageProviderId string, eventTime time.Time) {
 	tempData := m.tempDataMap.GetOrCreate(id)
 	if tempData.RecordTimeToFirstByte(eventTime) {
-		m.requestWithFirstByteReceivedCount.Add(ctx, 1)
-		m.timeToFirstByte.Record(ctx, eventTime.Sub(tempData.StartTime()).Seconds())
+		m.requestWithFirstByteReceivedCount.Add(ctx, 1, attribute.String("sp_id", storageProviderId), attribute.String("protocol", protocol(storageProviderId)))
+		m.timeToFirstByte.Record(ctx, eventTime.Sub(tempData.StartTime()).Seconds(), attribute.String("sp_id", storageProviderId), attribute.String("protocol", protocol(storageProviderId)))
 	}
 }
 
@@ -136,17 +137,24 @@ func (m *Metrics) HandleSuccessEvent(ctx context.Context, id types.RetrievalID, 
 	if storageProviderId == types.BitswapIndentifier {
 		m.requestWithBitswapSuccessCount.Add(ctx, 1)
 	} else {
-		m.requestWithGraphSyncSuccessCount.Add(ctx, 1)
+		m.requestWithGraphSyncSuccessCount.Add(ctx, 1, attribute.String("sp_id", storageProviderId))
 	}
 
 	// stats
-	m.retrievalDealDuration.Record(ctx, eventTime.Sub(finalDetails.StartTime).Seconds())
-	m.retrievalDealSize.Record(ctx, int64(receivedSize))
+	m.retrievalDealDuration.Record(ctx, eventTime.Sub(finalDetails.StartTime).Seconds(), attribute.String("sp_id", storageProviderId), attribute.String("protocol", protocol(storageProviderId)))
+	m.retrievalDealSize.Record(ctx, int64(receivedSize), attribute.String("sp_id", storageProviderId), attribute.String("protocol", protocol(storageProviderId)))
 	transferDuration := eventTime.Sub(finalDetails.TimeToFirstByte).Seconds()
-	m.bandwidthBytesPerSecond.Record(ctx, int64(receivedSize/transferDuration))
+	m.bandwidthBytesPerSecond.Record(ctx, int64(receivedSize/transferDuration), attribute.String("sp_id", storageProviderId), attribute.String("protocol", protocol(storageProviderId)))
 
 	// averages
 	m.indexerCandidatesPerRequestCount.Record(ctx, int64(finalDetails.IndexerCandidates))
 	m.indexerCandidatesFilteredPerRequestCount.Record(ctx, int64(finalDetails.IndexerFiltered))
 	m.failedRetrievalsPerRequestCount.Record(ctx, int64(finalDetails.FailedCount))
+}
+
+func protocol(storageProviderId string) string {
+	if storageProviderId == types.BitswapIndentifier {
+		return "bitswap"
+	}
+	return "graphsync"
 }

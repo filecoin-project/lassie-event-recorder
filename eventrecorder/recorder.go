@@ -82,7 +82,7 @@ func (r *EventRecorder) RecordEvents(ctx context.Context, events []Event) error 
 			case types.FailedCode:
 				r.cfg.metrics.HandleFailureEvent(ctx, event.RetrievalId, event.Phase, event.EventDetails)
 			case types.FirstByteCode:
-				r.cfg.metrics.HandleTimeToFirstByteEvent(ctx, event.RetrievalId, event.EventTime)
+				r.cfg.metrics.HandleTimeToFirstByteEvent(ctx, event.RetrievalId, event.StorageProviderId, event.EventTime)
 			case types.SuccessCode:
 				r.cfg.metrics.HandleSuccessEvent(ctx, event.RetrievalId, event.EventTime, event.StorageProviderId, event.EventDetails)
 			}
