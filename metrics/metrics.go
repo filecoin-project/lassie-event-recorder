@@ -225,6 +225,12 @@ func (m *Metrics) Start() error {
 		return err
 	}
 
+	if m.graphsyncRetrievalFailureCount, err = meter.Int64Counter(meterName+"/graphsync__retrieval_failure_total",
+		instrument.WithDescription("The graphsync requests that completed with a failure status"),
+	); err != nil {
+		return err
+	}
+
 	// errors
 	if m.retrievalErrorRejectedCount, err = meter.Int64Counter(meterName+"/retrieval_error_rejected_total",
 		instrument.WithDescription("The number of retrieval errors for 'response rejected'"),
@@ -300,6 +306,7 @@ type stats struct {
 	requestWithSuccessCount                   instrument.Int64Counter
 	requestWithBitswapSuccessCount            instrument.Int64Counter
 	requestWithGraphSyncSuccessCount          instrument.Int64Counter
+	graphsyncRetrievalFailureCount            instrument.Int64Counter
 
 	// stats
 	timeToFirstIndexerResult instrument.Float64Histogram

@@ -11,7 +11,7 @@ import (
 )
 
 // HandleFailureEvent is called when a query _or_ retrieval fails
-func (m *Metrics) HandleFailureEvent(ctx context.Context, id types.RetrievalID, phase types.Phase, details interface{}) {
+func (m *Metrics) HandleFailureEvent(ctx context.Context, id types.RetrievalID, phase types.Phase, storageProviderID string, details interface{}) {
 
 	detailsObj, ok := details.(map[string]interface{})
 	if !ok {
@@ -28,7 +28,9 @@ func (m *Metrics) HandleFailureEvent(ctx context.Context, id types.RetrievalID, 
 		_ = m.tempDataMap.Delete(id)
 		m.requestWithIndexerFailures.Add(ctx, 1)
 	case types.RetrievalPhase:
-
+		if storageProviderID != types.BitswapIndentifier {
+			m.graphsyncRetrievalFailureCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
+		}
 		var errorMetricMatches = map[string]instrument.Int64Counter{
 			"response rejected":                             m.retrievalErrorRejectedCount,
 			"Too many retrieval deals received":             m.retrievalErrorTooManyCount,
@@ -42,7 +44,7 @@ func (m *Metrics) HandleFailureEvent(ctx context.Context, id types.RetrievalID, 
 		var matched bool
 		for substr, metric := range errorMetricMatches {
 			if strings.Contains(msg, substr) {
-				metric.Add(ctx, 1)
+				metric.Add(ctx, 1, attribute.String("protocol", protocol(storageProviderID)))
 				matched = true
 				break
 			}
