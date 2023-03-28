@@ -50,7 +50,7 @@ func (m *Metrics) HandleFailureEvent(ctx context.Context, id types.RetrievalID, 
 			}
 		}
 		if !matched {
-			m.retrievalErrorOtherCount.Add(ctx, 1)
+			m.retrievalErrorOtherCount.Add(ctx, 1, attribute.String("protocol", protocol(storageProviderID)))
 		}
 	}
 }
