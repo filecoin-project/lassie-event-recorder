@@ -32,13 +32,17 @@ func (m *Metrics) HandleFailureEvent(ctx context.Context, id types.RetrievalID, 
 			m.graphsyncRetrievalFailureCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
 		}
 		var errorMetricMatches = map[string]instrument.Int64Counter{
-			"response rejected":                             m.retrievalErrorRejectedCount,
-			"Too many retrieval deals received":             m.retrievalErrorTooManyCount,
-			"Access Control":                                m.retrievalErrorACLCount,
-			"Under maintenance, retry later":                m.retrievalErrorMaintenanceCount,
-			"miner is not accepting online retrieval deals": m.retrievalErrorNoOnlineCount,
-			"unconfirmed block transfer":                    m.retrievalErrorUnconfirmedCount,
-			"timeout after ":                                m.retrievalErrorTimeoutCount,
+			"response rejected":                                 m.retrievalErrorRejectedCount,
+			"Too many retrieval deals received":                 m.retrievalErrorTooManyCount,
+			"Access Control":                                    m.retrievalErrorACLCount,
+			"Under maintenance, retry later":                    m.retrievalErrorMaintenanceCount,
+			"miner is not accepting online retrieval deals":     m.retrievalErrorNoOnlineCount,
+			"unconfirmed block transfer":                        m.retrievalErrorUnconfirmedCount,
+			"timeout after ":                                    m.retrievalErrorTimeoutCount,
+			"there is no unsealed piece containing payload cid": m.retrievalErrorNoUnsealedCount,
+			"getting pieces for cid":                            m.retrievalErrorDAGStoreCount,
+			"graphsync request failed to complete: request failed - unknown reason": m.retrievalErrorGraphsyncCount,
+			"failed to dial": m.retrievalErrorFailedToDialCount,
 		}
 
 		var matched bool

@@ -267,6 +267,27 @@ func (m *Metrics) Start() error {
 	); err != nil {
 		return err
 	}
+	if m.retrievalErrorNoUnsealedCount, err = meter.Int64Counter(meterName+"/retrieval_error_no_unsealed_total",
+		instrument.WithDescription("The number of retrieval errors where the provider could not find an unsealed piece"),
+	); err != nil {
+		return err
+	}
+	if m.retrievalErrorDAGStoreCount, err = meter.Int64Counter(meterName+"/retrieval_error_dagstore_total",
+		instrument.WithDescription("The number of retrieval errors due to DAG Store issues"),
+	); err != nil {
+		return err
+	}
+	if m.retrievalErrorGraphsyncCount, err = meter.Int64Counter(meterName+"/retrieval_error_graphsync_total",
+		instrument.WithDescription("The number of retrieval errors due to graphsync requests that errored"),
+	); err != nil {
+		return err
+	}
+	if m.retrievalErrorFailedToDialCount, err = meter.Int64Counter(meterName+"/retrieval_error_failed_to_dial_total",
+		instrument.WithDescription("The number of retrieval errors because we could not connected to the provider"),
+	); err != nil {
+		return err
+	}
+
 	if m.retrievalErrorOtherCount, err = meter.Int64Counter(meterName+"/retrieval_error_other_total",
 		instrument.WithDescription("The number of retrieval errors with uncategorized causes"),
 	); err != nil {
@@ -316,14 +337,18 @@ type stats struct {
 	retrievalDealSize        instrument.Int64Histogram
 
 	// error kinds
-	retrievalErrorRejectedCount    instrument.Int64Counter
-	retrievalErrorTooManyCount     instrument.Int64Counter
-	retrievalErrorACLCount         instrument.Int64Counter
-	retrievalErrorMaintenanceCount instrument.Int64Counter
-	retrievalErrorNoOnlineCount    instrument.Int64Counter
-	retrievalErrorUnconfirmedCount instrument.Int64Counter
-	retrievalErrorTimeoutCount     instrument.Int64Counter
-	retrievalErrorOtherCount       instrument.Int64Counter
+	retrievalErrorRejectedCount     instrument.Int64Counter
+	retrievalErrorTooManyCount      instrument.Int64Counter
+	retrievalErrorACLCount          instrument.Int64Counter
+	retrievalErrorMaintenanceCount  instrument.Int64Counter
+	retrievalErrorNoOnlineCount     instrument.Int64Counter
+	retrievalErrorUnconfirmedCount  instrument.Int64Counter
+	retrievalErrorTimeoutCount      instrument.Int64Counter
+	retrievalErrorOtherCount        instrument.Int64Counter
+	retrievalErrorNoUnsealedCount   instrument.Int64Counter
+	retrievalErrorDAGStoreCount     instrument.Int64Counter
+	retrievalErrorGraphsyncCount    instrument.Int64Counter
+	retrievalErrorFailedToDialCount instrument.Int64Counter
 
 	// averages
 	indexerCandidatesPerRequestCount         instrument.Int64Histogram
