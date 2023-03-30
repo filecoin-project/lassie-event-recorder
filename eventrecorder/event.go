@@ -62,7 +62,7 @@ func (e Event) Validate() error {
 		return errInvalidPhase
 	case e.PhaseStartTime.IsZero():
 		return errors.New("property phaseStartTime is required")
-	case e.PhaseStartTime.After(time.Now()):
+	case e.PhaseStartTime.After(time.Now().Add(24 * time.Hour)):
 		return errors.New("property phaseStartTime cannot be in the future")
 	case e.EventName == "":
 		return errors.New("property eventName is required")
@@ -70,12 +70,21 @@ func (e Event) Validate() error {
 		return errInvalidEventCode
 	case e.EventTime.IsZero():
 		return errors.New("property eventTime is required")
-	case e.EventTime.After(time.Now()):
+	case e.EventTime.After(time.Now().Add(24 * time.Hour)):
 		return errors.New("property eventTime cannot be in the future")
 	default:
 		_, err := cid.Decode(e.Cid)
 		if err != nil {
 			return fmt.Errorf("cid must be valid: %w", err)
+		}
+		// a few non rejecting weird cases we want to write a log about to monitor
+		switch {
+		case e.PhaseStartTime.After(time.Now()):
+			logger.Warnf("phaseStartTime (%s) ahead of current time (%s) for event %s, source %s",
+				e.PhaseStartTime, time.Now(), e.EventName, e.InstanceId)
+		case e.EventTime.After(time.Now()):
+			logger.Warnf("eventTime (%s) ahead of current time (%s) for event %s, source %s",
+				e.EventTime, time.Now(), e.EventName, e.InstanceId)
 		}
 		return nil
 	}
