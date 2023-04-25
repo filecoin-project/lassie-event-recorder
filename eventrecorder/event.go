@@ -120,15 +120,28 @@ func (e EventBatch) Validate() error {
 	return nil
 }
 
+type RetrievalAttempt struct {
+	Error           string `json:"error,omitempty"`
+	TimeToFirstByte string `json:"timeToFirstByte,omitempty"`
+}
+
 type AggregateEvent struct {
-	RetrievalID       string    `json:"retrievalId"`                 // The unique ID of the retrieval
 	InstanceID        string    `json:"instanceId"`                  // The ID of the Lassie instance generating the event
+	RetrievalID       string    `json:"retrievalId"`                 // The unique ID of the retrieval
 	StorageProviderID string    `json:"storageProviderId,omitempty"` // The ID of the storage provider that served the retrieval content
-	TimeToFirstByte   int64     `json:"timeToFirstByte,omitempty"`   // The time it took to receive the first byte in milliseconds
+	TimeToFirstByte   string    `json:"timeToFirstByte,omitempty"`   // The time it took to receive the first byte in milliseconds
 	Bandwidth         uint64    `json:"bandwidth,omitempty"`         // The bandwidth of the retrieval in bytes per second
+	BytesTransferred  uint64    `json:"bytesTransferred,omitempty"`  // The total transmitted deal size
 	Success           bool      `json:"success"`                     // Wether or not the retreival ended with a success event
 	StartTime         time.Time `json:"startTime"`                   // The time the retrieval started
 	EndTime           time.Time `json:"endTime"`                     // The time the retrieval ended
+
+	TimeToFirstIndexerResult  string                       `json:"timeToFirstIndexerResult,omitempty"` // time it took to receive our first "CandidateFound" event
+	IndexerCandidatesReceived int                          `json:"indexerCandidatesReceived"`          // The number of candidates received from the indexer
+	IndexerCandidatesFiltered int                          `json:"indexerCandidatesFiltered"`          // The number of candidates that made it through the filtering stage
+	ProtocolsAllowed          []string                     `json:"protocolsAllowed,omitempty"`         // The available protocols that could be used for this retrieval
+	ProtocolsAttempted        []string                     `json:"protocolsAttempted,omitempty"`       // The protocols that were used to attempt this retrieval
+	RetrievalAttempts         map[string]*RetrievalAttempt `json:"retrievalAttempts,omitempty"`        // All of the retrieval attempts, indexed by their SP ID
 }
 
 func (e AggregateEvent) Validate() error {
@@ -144,6 +157,29 @@ func (e AggregateEvent) Validate() error {
 	case e.EndTime.Before(e.StartTime):
 		return errors.New("property endTime cannot be before startTime")
 	default:
+		if e.TimeToFirstByte != "" {
+			_, err := time.ParseDuration(e.TimeToFirstByte)
+			if err != nil {
+				return err
+			}
+		}
+		if e.TimeToFirstIndexerResult != "" {
+			_, err := time.ParseDuration(e.TimeToFirstIndexerResult)
+			if err != nil {
+				return err
+			}
+		}
+		for _, retrievalAttempt := range e.RetrievalAttempts {
+			if retrievalAttempt == nil {
+				return errors.New("all retrieval attempts should have values")
+			}
+			if retrievalAttempt.TimeToFirstByte != "" {
+				_, err := time.ParseDuration(retrievalAttempt.TimeToFirstByte)
+				if err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	}
 }
