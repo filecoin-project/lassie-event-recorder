@@ -3,6 +3,7 @@ package eventrecorder
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/filecoin-project/lassie/pkg/types"
@@ -10,6 +11,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var logger = log.Logger("lassie/eventrecorder")
@@ -17,9 +21,12 @@ var logger = log.Logger("lassie/eventrecorder")
 type EventRecorder struct {
 	cfg *config
 	db  *pgxpool.Pool
+
+	mongo *mongo.Client
+	mc    *mongo.Collection
 }
 
-func New(opts ...option) (*EventRecorder, error) {
+func New(opts ...Option) (*EventRecorder, error) {
 	cfg, err := newConfig(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply option: %w", err)
@@ -207,6 +214,21 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 				attempts,
 			)
 		}
+		if r.mongo != nil && rand.Float32() < r.cfg.mongoPercentile {
+			_, err := r.mc.InsertOne(ctx, bson.D{
+				{Key: "retrieval_id", Value: event.RetrievalID},
+				{Key: "instance_id", Value: event.InstanceID},
+				{Key: "storage_provider_id", Value: event.StorageProviderID},
+				{Key: "time_to_first_byte_ms", Value: timeToFirstByte.Milliseconds()},
+				{Key: "bandwidth_bytes_sec", Value: int64(event.Bandwidth)},
+				{Key: "success", Value: event.Success},
+				{Key: "start_time", Value: event.StartTime},
+				{Key: "end_time", Value: event.EndTime},
+			})
+			if err != nil {
+				logger.Infof("failed to report to mongo: %w", err)
+			}
+		}
 	}
 	batchResult := r.db.SendBatch(ctx, &batchQuery)
 	err := batchResult.Close()
@@ -230,6 +252,19 @@ func (r *EventRecorder) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to instantiate database connection: %w", err)
 	}
+
+	if r.cfg.mongoEndpoint != "" {
+		r.mongo, err = mongo.NewClient(options.Client().ApplyURI(r.cfg.mongoEndpoint))
+		if err != nil {
+			return fmt.Errorf("failed to instantiate mongo database connection: %w", err)
+		}
+		timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err = r.mongo.Connect(timeout)
+		if err != nil {
+			return fmt.Errorf("failed to connect to mongo: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -237,4 +272,13 @@ func (r *EventRecorder) Shutdown() {
 	logger.Info("Closing database connection...")
 	r.db.Close()
 	logger.Info("Database connection closed successfully.")
+	if r.mongo != nil {
+		timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err := r.mongo.Disconnect(timeout)
+		if err != nil {
+			logger.Warn("failed to close mongo connection: %v", err)
+		}
+		r.mc = r.mongo.Database(r.cfg.mongoDB).Collection(r.cfg.mongoCollection)
+	}
 }

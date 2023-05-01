@@ -23,6 +23,10 @@ func main() {
 	dbDSN := flag.String("dbDSN", "", "The database Data Source Name. Alternatively, it may be specified via LASSIE_EVENT_RECORDER_DB_DSN environment variable. If both are present, the environment variable takes precedence.")
 	logLevel := flag.String("logLevel", "info", "The logging level. Only applied if GOLOG_LOG_LEVEL environment variable is unset.")
 	metricsListenAddr := flag.String("metricsListenAddr", "0.0.0.0:7777", "The metrics server listen address in address:port format.")
+	mongoAddr := flag.String("mongo", "", "A Mongo endpoint to write to.")
+	mongoDB := flag.String("mongoDB", "", "The Mongo DB to write to.")
+	mongoCollection := flag.String("mongoCollection", "", "The Mongo Collection to write to.")
+	mongoPercent := flag.Float64("mongoPercent", 0.0, "How many aggregate writes to push to mongo")
 
 	flag.Parse()
 
@@ -45,9 +49,15 @@ func main() {
 
 	metrics := metrics.New()
 
-	dbUrl := eventrecorder.WithDatabaseDSN(*dbDSN)
-	metricsOpt := eventrecorder.WithMetrics(metrics)
-	recorder, err := eventrecorder.New(dbUrl, metricsOpt)
+	opts := []eventrecorder.Option{
+		eventrecorder.WithDatabaseDSN(*dbDSN),
+		eventrecorder.WithMetrics(metrics),
+	}
+	if *mongoAddr != "" {
+		mOpt := eventrecorder.WithMongoSubmissions(*mongoAddr, *mongoDB, *mongoCollection, float32(*mongoPercent))
+		opts = append(opts, mOpt)
+	}
+	recorder, err := eventrecorder.New(opts...)
 	if err != nil {
 		logger.Fatalw("Failed to instantiate recorder", "err", err)
 	}
