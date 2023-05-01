@@ -14,12 +14,17 @@ type (
 		// pgxPoolConfig is instantiated by parsing config.dbDSN.
 		pgxPoolConfig *pgxpool.Config
 
+		mongoEndpoint   string
+		mongoDB         string
+		mongoCollection string
+		mongoPercentile float32
+
 		metrics *metrics.Metrics
 	}
-	option func(*config) error
+	Option func(*config) error
 )
 
-func newConfig(opts []option) (*config, error) {
+func newConfig(opts []Option) (*config, error) {
 	cfg := &config{}
 	for _, opt := range opts {
 		if err := opt(cfg); err != nil {
@@ -37,14 +42,24 @@ func newConfig(opts []option) (*config, error) {
 	return cfg, nil
 }
 
-func WithDatabaseDSN(url string) option {
+func WithDatabaseDSN(url string) Option {
 	return func(cfg *config) error {
 		cfg.dbDSN = url
 		return nil
 	}
 }
 
-func WithMetrics(metrics *metrics.Metrics) option {
+func WithMongoSubmissions(endpoint, db, collection string, percentage float32) Option {
+	return func(c *config) error {
+		c.mongoEndpoint = endpoint
+		c.mongoDB = db
+		c.mongoCollection = collection
+		c.mongoPercentile = percentage
+		return nil
+	}
+}
+
+func WithMetrics(metrics *metrics.Metrics) Option {
 	return func(cfg *config) error {
 		cfg.metrics = metrics
 		return nil
