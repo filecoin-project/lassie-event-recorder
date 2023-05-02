@@ -26,7 +26,7 @@ func main() {
 	mongoAddr := flag.String("mongo", "", "A Mongo endpoint to write to.")
 	mongoDB := flag.String("mongoDB", "", "The Mongo DB to write to.")
 	mongoCollection := flag.String("mongoCollection", "", "The Mongo Collection to write to.")
-	mongoPercent := flag.Float64("mongoPercent", 0.0, "How many aggregate writes to push to mongo")
+	mongoPercent := flag.Float64("mongoPercent", 0.0, "Percentage chance that a write will push to mongo [0,1]")
 
 	flag.Parse()
 
