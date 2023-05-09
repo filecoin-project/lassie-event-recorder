@@ -214,7 +214,10 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 				attempts,
 			)
 		}
-		if r.mongo != nil && rand.Float32() < r.cfg.mongoPercentile {
+
+		if r.mongo != nil &&
+			rand.Float32() < r.cfg.mongoPercentile &&
+			event.StorageProviderID != "bitswap" {
 			_, err := r.mc.InsertOne(ctx, bson.D{
 				{Key: "retrieval_id", Value: event.RetrievalID},
 				{Key: "instance_id", Value: event.InstanceID},
