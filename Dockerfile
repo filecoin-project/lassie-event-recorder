@@ -8,7 +8,11 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o /go/bin/recorder ./cmd/recorder
 
+FROM busybox:1.35.0-uclibc as busybox
+
 FROM gcr.io/distroless/static-debian11
 COPY --from=build /go/bin/recorder /usr/bin/
+COPY --from=busybox /bin/sh /bin/sh
 
-ENTRYPOINT ["/usr/bin/recorder", "-mongoDB", "SP Reputation", "-mongoCollection", "lassie" "-mongoPercent", "0.01"]
+ENTRYPOINT ["/usr/bin/recorder"]
+CMD ["-mongoDB", "SP Reputation", "-mongoCollection", "lassie" "-mongoPercent", "0.01"]
