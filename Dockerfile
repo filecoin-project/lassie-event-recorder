@@ -11,4 +11,4 @@ RUN CGO_ENABLED=0 go build -o /go/bin/recorder ./cmd/recorder
 FROM gcr.io/distroless/static-debian11
 COPY --from=build /go/bin/recorder /usr/bin/
 
-ENTRYPOINT ["/usr/bin/recorder"]
+ENTRYPOINT ["/usr/bin/recorder", "-mongoDB", "SP Reputation", "-mongoCollection", "lassie" "-mongoPercent", "0.01"]
