@@ -38,6 +38,10 @@ func main() {
 		dbDSN = &v
 	}
 
+	if v, set := os.LookupEnv("LASSIE_EVENT_RECORDER_MONGO"); set {
+		mongoAddr = &v
+	}
+
 	metricsMux := http.NewServeMux()
 	metricsMux.Handle("/metrics", promhttp.Handler())
 
