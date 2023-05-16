@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -215,19 +214,20 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			)
 		}
 
-		if r.mongo != nil &&
+		if r.mc != nil &&
 			rand.Float32() < r.cfg.mongoPercentile &&
 			event.StorageProviderID != "bitswap" {
-			_, err := r.mc.InsertOne(ctx, bson.D{
-				{Key: "retrieval_id", Value: event.RetrievalID},
-				{Key: "instance_id", Value: event.InstanceID},
-				{Key: "storage_provider_id", Value: event.StorageProviderID},
-				{Key: "time_to_first_byte_ms", Value: timeToFirstByte.Milliseconds()},
-				{Key: "bandwidth_bytes_sec", Value: int64(event.Bandwidth)},
-				{Key: "success", Value: event.Success},
-				{Key: "start_time", Value: event.StartTime},
-				{Key: "end_time", Value: event.EndTime},
-			})
+			report := RetrievalReport{
+				RetrievalID:       event.RetrievalID,
+				InstanceID:        event.InstanceID,
+				StorageProviderID: event.StorageProviderID,
+				TTFB:              timeToFirstByte.Milliseconds(),
+				Bandwidth:         int64(event.Bandwidth),
+				Success:           event.Success,
+				StartTime:         event.StartTime,
+				EndTime:           event.EndTime,
+			}
+			_, err := r.mc.InsertOne(ctx, report)
 			if err != nil {
 				logger.Infof("failed to report to mongo: %w", err)
 			}
@@ -249,6 +249,17 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 	return nil
 }
 
+type RetrievalReport struct {
+	RetrievalID       string    `bson:"retrieval_id"`
+	InstanceID        string    `bson:"instance_id"`
+	StorageProviderID string    `bson:"storage_provider_id"`
+	TTFB              int64     `bson:"time_to_first_byte_ms"`
+	Bandwidth         int64     `bson:"bandwidth_bytes_sec"`
+	Success           bool      `bson:"success"`
+	StartTime         time.Time `bson:"start_time"`
+	EndTime           time.Time `bson:"end_time"`
+}
+
 func (r *EventRecorder) Start(ctx context.Context) error {
 	var err error
 	r.db, err = pgxpool.NewWithConfig(ctx, r.cfg.pgxPoolConfig)
@@ -267,6 +278,7 @@ func (r *EventRecorder) Start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to connect to mongo: %w", err)
 		}
+		r.mc = r.mongo.Database(r.cfg.mongoDB).Collection(r.cfg.mongoCollection)
 	}
 	return nil
 }
@@ -282,6 +294,5 @@ func (r *EventRecorder) Shutdown() {
 		if err != nil {
 			logger.Warn("failed to close mongo connection: %v", err)
 		}
-		r.mc = r.mongo.Database(r.cfg.mongoDB).Collection(r.cfg.mongoCollection)
 	}
 }
