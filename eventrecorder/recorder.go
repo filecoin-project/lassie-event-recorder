@@ -216,7 +216,8 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 
 		if r.mc != nil &&
 			rand.Float32() < r.cfg.mongoPercentile &&
-			event.StorageProviderID != "bitswap" {
+			event.StorageProviderID != "Bitswap" &&
+			event.StorageProviderID != "" {
 			report := RetrievalReport{
 				RetrievalID:       event.RetrievalID,
 				InstanceID:        event.InstanceID,
