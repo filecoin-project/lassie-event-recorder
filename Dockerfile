@@ -15,4 +15,3 @@ COPY --from=build /go/bin/recorder /usr/bin/
 COPY --from=busybox /bin/sh /bin/sh
 
 ENTRYPOINT ["/usr/bin/recorder"]
-CMD ["-mongoDB", "reputation", "-mongoCollection", "lassie" "-mongoPercent", "0.01"]
