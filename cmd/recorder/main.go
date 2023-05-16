@@ -58,6 +58,7 @@ func main() {
 		eventrecorder.WithMetrics(metrics),
 	}
 	if *mongoAddr != "" {
+		logger.Info("Including mongo reporting")
 		mOpt := eventrecorder.WithMongoSubmissions(*mongoAddr, *mongoDB, *mongoCollection, float32(*mongoPercent))
 		opts = append(opts, mOpt)
 	}
