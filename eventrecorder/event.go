@@ -123,6 +123,7 @@ func (e EventBatch) Validate() error {
 type RetrievalAttempt struct {
 	Error           string `json:"error,omitempty"`
 	TimeToFirstByte string `json:"timeToFirstByte,omitempty"`
+	Protocol        string `json:"protocol,omitempty"`
 }
 
 type AggregateEvent struct {

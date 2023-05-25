@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/filecoin-project/lassie-event-recorder/metrics"
 	"github.com/filecoin-project/lassie/pkg/types"
 	"github.com/ipfs/go-log/v2"
 	"github.com/jackc/pgx/v5"
@@ -168,19 +169,25 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			}
 			return nil
 		})
-		attempts := make(map[string]string, len(event.RetrievalAttempts))
+		attempts := make(map[string]metrics.Attempt, len(event.RetrievalAttempts))
 		for storageProviderID, retrievalAttempt := range event.RetrievalAttempts {
-			attempts[storageProviderID] = retrievalAttempt.Error
+
 			var timeToFirstByte time.Duration
 			if retrievalAttempt.TimeToFirstByte != "" {
 				timeToFirstByte, _ = time.ParseDuration(retrievalAttempt.TimeToFirstByte)
+			}
+			attempts[storageProviderID] = metrics.Attempt{
+				Error:           retrievalAttempt.Error,
+				Protocol:        retrievalAttempt.Protocol,
+				TimeToFirstByte: timeToFirstByte,
 			}
 			query := `
 		  INSERT INTO retrieval_attempts(
 			  retrieval_id,
 			  storage_provider_id,
 			  time_to_first_byte,
-			  error
+			  error,
+				protocol
 		  )
 		  VALUES ($1, $2, $3, $4)
 		  `
@@ -189,6 +196,7 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 				storageProviderID,
 				timeToFirstByte,
 				retrievalAttempt.Error,
+				retrievalAttempt.Protocol,
 			).Exec(func(ct pgconn.CommandTag) error {
 				rowsAffected := ct.RowsAffected()
 				switch rowsAffected {
