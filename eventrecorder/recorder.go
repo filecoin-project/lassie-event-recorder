@@ -137,9 +137,10 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			indexer_candidates_received,
 			indexer_candidates_filtered,
 			protocols_allowed,
-			protocols_attempted
+			protocols_attempted,
+			protocol_succeeded
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		`
 		batchQuery.Queue(query,
 			event.InstanceID,
@@ -156,6 +157,7 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			event.IndexerCandidatesFiltered,
 			event.ProtocolsAllowed,
 			event.ProtocolsAttempted,
+			event.ProtocolSucceeded,
 		).Exec(func(ct pgconn.CommandTag) error {
 			rowsAffected := ct.RowsAffected()
 			switch rowsAffected {
@@ -211,6 +213,7 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 				int64(event.IndexerCandidatesReceived),
 				int64(event.IndexerCandidatesFiltered),
 				attempts,
+				event.ProtocolSucceeded,
 			)
 		}
 
