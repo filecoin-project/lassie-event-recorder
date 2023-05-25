@@ -191,6 +191,11 @@ func (m *Metrics) Start() error {
 	); err != nil {
 		return err
 	}
+	if m.requestWithHttpSuccessCount, err = meter.Int64Counter(meterName+"/request_with_http_success",
+		instrument.WithDescription("The number of successful retrievals via lassie (all bytes received) over http"),
+	); err != nil {
+		return err
+	}
 
 	// stats
 
@@ -327,6 +332,7 @@ type stats struct {
 	requestWithSuccessCount                   instrument.Int64Counter
 	requestWithBitswapSuccessCount            instrument.Int64Counter
 	requestWithGraphSyncSuccessCount          instrument.Int64Counter
+	requestWithHttpSuccessCount               instrument.Int64Counter
 	graphsyncRetrievalFailureCount            instrument.Int64Counter
 
 	// stats

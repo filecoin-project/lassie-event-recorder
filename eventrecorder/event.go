@@ -141,6 +141,7 @@ type AggregateEvent struct {
 	IndexerCandidatesFiltered int                          `json:"indexerCandidatesFiltered"`          // The number of candidates that made it through the filtering stage
 	ProtocolsAllowed          []string                     `json:"protocolsAllowed,omitempty"`         // The available protocols that could be used for this retrieval
 	ProtocolsAttempted        []string                     `json:"protocolsAttempted,omitempty"`       // The protocols that were used to attempt this retrieval
+	ProtocolSucceeded         string                       `json:"protocolSucceeded,omitempty"`        // The protocol used for a successful event
 	RetrievalAttempts         map[string]*RetrievalAttempt `json:"retrievalAttempts,omitempty"`        // All of the retrieval attempts, indexed by their SP ID
 }
 

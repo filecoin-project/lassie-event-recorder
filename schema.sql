@@ -24,7 +24,8 @@ create table if not exists aggregate_retrieval_events(
 	indexer_candidates_received integer,
 	indexer_candidates_filtered integer,
 	protocols_allowed        varchar[256][],    
-	protocols_attempted      varchar[256][]
+	protocols_attempted      varchar[256][],
+  protocol_succeeded       varchar[256]
 );
 
 create table if not exists retrieval_attempts(

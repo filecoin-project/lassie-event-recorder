@@ -6,8 +6,15 @@ import (
 	"time"
 
 	"github.com/filecoin-project/lassie/pkg/types"
+	"github.com/multiformats/go-multicodec"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric/instrument"
+)
+
+var (
+	ProtocolBitswap   = "bitswap"
+	ProtocolGraphsync = "graphsync"
+	ProtocolHttp      = "http"
 )
 
 // HandleFailureEvent is called when a query _or_ retrieval fails
@@ -96,8 +103,8 @@ func (m *Metrics) HandleCandidatesFilteredEvent(ctx context.Context, id types.Re
 func (m *Metrics) HandleTimeToFirstByteEvent(ctx context.Context, id types.RetrievalID, storageProviderId string, eventTime time.Time) {
 	tempData := m.tempDataMap.GetOrCreate(id)
 	if tempData.RecordTimeToFirstByte(eventTime) {
-		m.requestWithFirstByteReceivedCount.Add(ctx, 1, attribute.String("protocol", protocol(storageProviderId)))
-		m.timeToFirstByte.Record(ctx, eventTime.Sub(tempData.StartTime()).Seconds(), attribute.String("protocol", protocol(storageProviderId)))
+		m.requestWithFirstByteReceivedCount.Add(ctx, 1, attribute.String("protocol", protocolFromSpID(storageProviderId)))
+		m.timeToFirstByte.Record(ctx, eventTime.Sub(tempData.StartTime()).Seconds(), attribute.String("protocol", protocolFromSpID(storageProviderId)))
 	}
 }
 
@@ -123,10 +130,10 @@ func (m *Metrics) HandleSuccessEvent(ctx context.Context, id types.RetrievalID, 
 	}
 
 	// stats
-	m.retrievalDealDuration.Record(ctx, eventTime.Sub(finalDetails.StartTime).Seconds(), attribute.String("protocol", protocol(storageProviderId)))
-	m.retrievalDealSize.Record(ctx, int64(receivedSize), attribute.String("protocol", protocol(storageProviderId)))
+	m.retrievalDealDuration.Record(ctx, eventTime.Sub(finalDetails.StartTime).Seconds(), attribute.String("protocol", protocolFromSpID(storageProviderId)))
+	m.retrievalDealSize.Record(ctx, int64(receivedSize), attribute.String("protocol", protocolFromSpID(storageProviderId)))
 	transferDuration := eventTime.Sub(finalDetails.TimeToFirstByte).Seconds()
-	m.bandwidthBytesPerSecond.Record(ctx, int64(receivedSize/transferDuration), attribute.String("protocol", protocol(storageProviderId)))
+	m.bandwidthBytesPerSecond.Record(ctx, int64(receivedSize/transferDuration), attribute.String("protocol", protocolFromSpID(storageProviderId)))
 
 	// averages
 	m.indexerCandidatesPerRequestCount.Record(ctx, int64(finalDetails.IndexerCandidates))
@@ -145,7 +152,8 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 	bytesTransferred int64,
 	indexerCandidates int64,
 	indexerFiltered int64,
-	attempts map[string]string) {
+	attempts map[string]string,
+	protocolSucceeded string) {
 	m.totalRequestCount.Add(ctx, 1)
 	failureCount := 0
 	var recordedGraphSync, recordedBitswap bool
@@ -179,20 +187,25 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 		m.requestWithIndexerCandidatesFilteredCount.Add(ctx, 1)
 	}
 	if timeToFirstByte > 0 {
-		m.requestWithFirstByteReceivedCount.Add(ctx, 1, attribute.String("protocol", protocol(storageProviderID)))
-		m.timeToFirstByte.Record(ctx, timeToFirstByte.Seconds(), attribute.String("protocol", protocol(storageProviderID)))
+		m.requestWithFirstByteReceivedCount.Add(ctx, 1, attribute.String("protocol", protocolFromSpID(storageProviderID)))
+		m.timeToFirstByte.Record(ctx, timeToFirstByte.Seconds(), attribute.String("protocol", protocolFromSpID(storageProviderID)))
 	}
 	if success {
+		protocol := protocolFromMulticodecString(protocolSucceeded)
+
 		m.requestWithSuccessCount.Add(ctx, 1)
-		if storageProviderID == types.BitswapIndentifier {
+		switch protocol {
+		case ProtocolBitswap:
 			m.requestWithBitswapSuccessCount.Add(ctx, 1)
-		} else {
+		case ProtocolGraphsync:
 			m.requestWithGraphSyncSuccessCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
+		case ProtocolHttp:
+			m.requestWithHttpSuccessCount.Add(ctx, 1)
 		}
 
-		m.retrievalDealDuration.Record(ctx, endTime.Sub(startTime).Seconds(), attribute.String("protocol", protocol(storageProviderID)))
-		m.retrievalDealSize.Record(ctx, bytesTransferred, attribute.String("protocol", protocol(storageProviderID)))
-		m.bandwidthBytesPerSecond.Record(ctx, bandwidth, attribute.String("protocol", protocol(storageProviderID)))
+		m.retrievalDealDuration.Record(ctx, endTime.Sub(startTime).Seconds(), attribute.String("protocol", protocol))
+		m.retrievalDealSize.Record(ctx, bytesTransferred, attribute.String("protocol", protocol))
+		m.bandwidthBytesPerSecond.Record(ctx, bandwidth, attribute.String("protocol", protocol))
 
 		m.indexerCandidatesPerRequestCount.Record(ctx, indexerCandidates)
 		m.indexerCandidatesFilteredPerRequestCount.Record(ctx, indexerFiltered)
@@ -220,18 +233,30 @@ func (m *Metrics) matchErrorMessage(ctx context.Context, msg string, storageProv
 	var matched bool
 	for substr, metric := range errorMetricMatches {
 		if strings.Contains(msg, substr) {
-			metric.Add(ctx, 1, attribute.String("protocol", protocol(storageProviderID)))
+			metric.Add(ctx, 1, attribute.String("protocol", protocolFromSpID(storageProviderID)))
 			matched = true
 			break
 		}
 	}
 	if !matched {
-		m.retrievalErrorOtherCount.Add(ctx, 1, attribute.String("protocol", protocol(storageProviderID)))
+		m.retrievalErrorOtherCount.Add(ctx, 1, attribute.String("protocol", protocolFromSpID(storageProviderID)))
 	}
 }
-func protocol(storageProviderId string) string {
+func protocolFromSpID(storageProviderId string) string {
 	if storageProviderId == types.BitswapIndentifier {
-		return "bitswap"
+		return ProtocolBitswap
 	}
-	return "graphsync"
+	return ProtocolGraphsync
+}
+func protocolFromMulticodecString(multicodecCodeString string) string {
+	switch multicodecCodeString {
+	case multicodec.TransportBitswap.String():
+		return ProtocolBitswap
+	case multicodec.TransportGraphsyncFilecoinv1.String():
+		return ProtocolGraphsync
+	case multicodec.TransportIpfsGatewayHttp.String():
+		return ProtocolHttp
+	default:
+		return multicodecCodeString
+	}
 }
