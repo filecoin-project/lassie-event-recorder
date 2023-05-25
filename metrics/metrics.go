@@ -171,6 +171,11 @@ func (m *Metrics) Start() error {
 	); err != nil {
 		return err
 	}
+	if m.requestWithHttpAttempt, err = meter.Int64Counter(meterName+"/request_with_http_attempts",
+		instrument.WithDescription("The number of requests where an http retrieval was attempted"),
+	); err != nil {
+		return err
+	}
 	if m.requestWithFirstByteReceivedCount, err = meter.Int64Counter(meterName+"/request_with_first_byte_received",
 		instrument.WithDescription("The number of requests where a non-zero number of bytes were received"),
 	); err != nil {
@@ -235,7 +240,11 @@ func (m *Metrics) Start() error {
 	); err != nil {
 		return err
 	}
-
+	if m.httpRetrievalFailureCount, err = meter.Int64Counter(meterName+"/http__retrieval_failure_total",
+		instrument.WithDescription("The http requests that completed with a failure status"),
+	); err != nil {
+		return err
+	}
 	// errors
 	if m.retrievalErrorRejectedCount, err = meter.Int64Counter(meterName+"/retrieval_error_rejected_total",
 		instrument.WithDescription("The number of retrieval errors for 'response rejected'"),
@@ -326,6 +335,7 @@ type stats struct {
 	requestWithIndexerFailures                instrument.Int64Counter
 	requestWithIndexerCandidatesCount         instrument.Int64Counter
 	requestWithIndexerCandidatesFilteredCount instrument.Int64Counter
+	requestWithHttpAttempt                    instrument.Int64Counter
 	requestWithBitswapAttempt                 instrument.Int64Counter
 	requestWithGraphSyncAttempt               instrument.Int64Counter
 	requestWithFirstByteReceivedCount         instrument.Int64Counter
@@ -333,6 +343,7 @@ type stats struct {
 	requestWithBitswapSuccessCount            instrument.Int64Counter
 	requestWithGraphSyncSuccessCount          instrument.Int64Counter
 	requestWithHttpSuccessCount               instrument.Int64Counter
+	httpRetrievalFailureCount                 instrument.Int64Counter
 	graphsyncRetrievalFailureCount            instrument.Int64Counter
 
 	// stats
