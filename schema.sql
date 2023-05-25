@@ -32,6 +32,7 @@ create table if not exists retrieval_attempts(
   retrieval_id uuid not null,
   storage_provider_id character varying(256),
   time_to_first_byte int8,
-  error character varying(256),
+  error text,
+  protocol varchar[256],
   FOREIGN KEY (retrieval_id) REFERENCES aggregate_retrieval_events (retrieval_id)
 );

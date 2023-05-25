@@ -141,6 +141,12 @@ func (m *Metrics) HandleSuccessEvent(ctx context.Context, id types.RetrievalID, 
 	m.failedRetrievalsPerRequestCount.Record(ctx, int64(finalDetails.FailedCount))
 }
 
+type Attempt struct {
+	Error           string
+	Protocol        string
+	TimeToFirstByte time.Duration
+}
+
 func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 	timeToFirstIndexerResult time.Duration,
 	timeToFirstByte time.Duration,
@@ -152,29 +158,44 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 	bytesTransferred int64,
 	indexerCandidates int64,
 	indexerFiltered int64,
-	attempts map[string]string,
+	attempts map[string]Attempt,
 	protocolSucceeded string) {
 	m.totalRequestCount.Add(ctx, 1)
 	failureCount := 0
-	var recordedGraphSync, recordedBitswap bool
-	for storageProviderID, msg := range attempts {
-		if storageProviderID == types.BitswapIndentifier {
+	var recordedGraphSync, recordedBitswap, recordedHttp bool
+	var lowestTTFB time.Duration
+	var lowestTTFBProtocol string
+	for storageProviderID, attempt := range attempts {
+		switch protocolFromMulticodecString(attempt.Protocol) {
+		case ProtocolBitswap:
 			if !recordedBitswap {
 				recordedBitswap = true
 				m.requestWithBitswapAttempt.Add(ctx, 1)
 			}
-		} else {
+		case ProtocolGraphsync:
 			if !recordedGraphSync {
 				recordedGraphSync = true
 				m.requestWithGraphSyncAttempt.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
 			}
-		}
-		if msg != "" {
-			if storageProviderID != types.BitswapIndentifier {
-				m.graphsyncRetrievalFailureCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
+		case ProtocolHttp:
+			if !recordedHttp {
+				recordedHttp = true
+				m.requestWithHttpAttempt.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
 			}
-			m.matchErrorMessage(ctx, msg, storageProviderID)
+		}
+		if attempt.Error != "" {
+			switch protocolFromMulticodecString(attempt.Protocol) {
+			case ProtocolGraphsync:
+				m.graphsyncRetrievalFailureCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
+			case ProtocolHttp:
+				m.httpRetrievalFailureCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
+			default:
+			}
+			m.matchErrorMessage(ctx, attempt.Error, storageProviderID)
 			failureCount += 0
+		}
+		if attempt.TimeToFirstByte != time.Duration(0) && (lowestTTFB == time.Duration(0) || attempt.TimeToFirstByte < lowestTTFB) {
+			lowestTTFBProtocol = protocolFromMulticodecString(attempt.Protocol)
 		}
 	}
 	if timeToFirstIndexerResult > 0 {
@@ -187,8 +208,8 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 		m.requestWithIndexerCandidatesFilteredCount.Add(ctx, 1)
 	}
 	if timeToFirstByte > 0 {
-		m.requestWithFirstByteReceivedCount.Add(ctx, 1, attribute.String("protocol", protocolFromSpID(storageProviderID)))
-		m.timeToFirstByte.Record(ctx, timeToFirstByte.Seconds(), attribute.String("protocol", protocolFromSpID(storageProviderID)))
+		m.requestWithFirstByteReceivedCount.Add(ctx, 1, attribute.String("protocol", lowestTTFBProtocol))
+		m.timeToFirstByte.Record(ctx, timeToFirstByte.Seconds(), attribute.String("protocol", lowestTTFBProtocol))
 	}
 	if success {
 		protocol := protocolFromMulticodecString(protocolSucceeded)
@@ -215,7 +236,7 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 	}
 }
 
-func (m *Metrics) matchErrorMessage(ctx context.Context, msg string, storageProviderID string) {
+func (m *Metrics) matchErrorMessage(ctx context.Context, msg string, protocol string) {
 	var errorMetricMatches = map[string]instrument.Int64Counter{
 		"response rejected":                                 m.retrievalErrorRejectedCount,
 		"Too many retrieval deals received":                 m.retrievalErrorTooManyCount,
@@ -233,13 +254,13 @@ func (m *Metrics) matchErrorMessage(ctx context.Context, msg string, storageProv
 	var matched bool
 	for substr, metric := range errorMetricMatches {
 		if strings.Contains(msg, substr) {
-			metric.Add(ctx, 1, attribute.String("protocol", protocolFromSpID(storageProviderID)))
+			metric.Add(ctx, 1, attribute.String("protocol", protocolFromMulticodecString(protocol)))
 			matched = true
 			break
 		}
 	}
 	if !matched {
-		m.retrievalErrorOtherCount.Add(ctx, 1, attribute.String("protocol", protocolFromSpID(storageProviderID)))
+		m.retrievalErrorOtherCount.Add(ctx, 1, attribute.String("protocol", protocolFromMulticodecString(protocol)))
 	}
 }
 func protocolFromSpID(storageProviderId string) string {
