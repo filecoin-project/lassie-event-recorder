@@ -38,7 +38,12 @@ func (m *Metrics) HandleFailureEvent(ctx context.Context, id types.RetrievalID, 
 		if storageProviderID != types.BitswapIndentifier {
 			m.graphsyncRetrievalFailureCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
 		}
-		m.matchErrorMessage(ctx, msg, storageProviderID)
+		protocol := protocolFromSpID(storageProviderID)
+		if metric, matched := m.getMatchingErrorMetric(ctx, msg); matched {
+			metric.Add(ctx, 1, attribute.String("protocol", protocol))
+		} else {
+			m.retrievalErrorOtherCount.Add(ctx, 1, attribute.String("protocol", protocol))
+		}
 	}
 }
 
@@ -166,7 +171,8 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 	var lowestTTFB time.Duration
 	var lowestTTFBProtocol string
 	for storageProviderID, attempt := range attempts {
-		switch protocolFromMulticodecString(attempt.Protocol) {
+		protocolAttempted := protocolFromMulticodecString(attempt.Protocol)
+		switch protocolAttempted {
 		case ProtocolBitswap:
 			if !recordedBitswap {
 				recordedBitswap = true
@@ -184,20 +190,25 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 			}
 		}
 		if attempt.Error != "" {
-			switch protocolFromMulticodecString(attempt.Protocol) {
+			switch protocolAttempted {
 			case ProtocolGraphsync:
 				m.graphsyncRetrievalFailureCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
 			case ProtocolHttp:
 				m.httpRetrievalFailureCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
 			default:
 			}
-			m.matchErrorMessage(ctx, attempt.Error, storageProviderID)
+			if metric, matched := m.getMatchingErrorMetric(ctx, attempt.Error); matched {
+				metric.Add(ctx, 1, attribute.String("protocol", protocolAttempted))
+			} else {
+				m.retrievalErrorOtherCount.Add(ctx, 1, attribute.String("protocol", protocolAttempted))
+			}
 			failureCount += 0
 		}
 		if attempt.TimeToFirstByte != time.Duration(0) && (lowestTTFB == time.Duration(0) || attempt.TimeToFirstByte < lowestTTFB) {
-			lowestTTFBProtocol = protocolFromMulticodecString(attempt.Protocol)
+			lowestTTFBProtocol = protocolAttempted
 		}
 	}
+
 	if timeToFirstIndexerResult > 0 {
 		m.timeToFirstIndexerResult.Record(ctx, timeToFirstIndexerResult.Seconds())
 	}
@@ -221,7 +232,7 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 		case ProtocolGraphsync:
 			m.requestWithGraphSyncSuccessCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
 		case ProtocolHttp:
-			m.requestWithHttpSuccessCount.Add(ctx, 1)
+			m.requestWithHttpSuccessCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
 		}
 
 		m.retrievalDealDuration.Record(ctx, endTime.Sub(startTime).Seconds(), attribute.String("protocol", protocol))
@@ -236,7 +247,7 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 	}
 }
 
-func (m *Metrics) matchErrorMessage(ctx context.Context, msg string, protocol string) {
+func (m *Metrics) getMatchingErrorMetric(ctx context.Context, msg string) (instrument.Int64Counter, bool) {
 	var errorMetricMatches = map[string]instrument.Int64Counter{
 		"response rejected":                                 m.retrievalErrorRejectedCount,
 		"Too many retrieval deals received":                 m.retrievalErrorTooManyCount,
@@ -251,17 +262,13 @@ func (m *Metrics) matchErrorMessage(ctx context.Context, msg string, protocol st
 		"failed to dial": m.retrievalErrorFailedToDialCount,
 	}
 
-	var matched bool
 	for substr, metric := range errorMetricMatches {
 		if strings.Contains(msg, substr) {
-			metric.Add(ctx, 1, attribute.String("protocol", protocolFromMulticodecString(protocol)))
-			matched = true
-			break
+			return metric, true
 		}
 	}
-	if !matched {
-		m.retrievalErrorOtherCount.Add(ctx, 1, attribute.String("protocol", protocolFromMulticodecString(protocol)))
-	}
+
+	return nil, false
 }
 func protocolFromSpID(storageProviderId string) string {
 	if storageProviderId == types.BitswapIndentifier {
