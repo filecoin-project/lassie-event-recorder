@@ -205,7 +205,8 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 			failureCount += 0
 		}
 		if attempt.TimeToFirstByte != time.Duration(0) && (lowestTTFB == time.Duration(0) || attempt.TimeToFirstByte < lowestTTFB) {
-			lowestTTFBProtocol = protocolAttempted
+			lowestTTFB = attempt.TimeToFirstByte
+			lowestTTFBProtocol = protocolFromMulticodecString(attempt.Protocol)
 		}
 	}
 
