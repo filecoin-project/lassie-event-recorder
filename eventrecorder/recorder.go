@@ -189,7 +189,7 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			  error,
 				protocol
 		  )
-		  VALUES ($1, $2, $3, $4)
+		  VALUES ($1, $2, $3, $4, $5)
 		  `
 			batchRetrievalAttempts.Queue(query,
 				event.RetrievalID,
