@@ -302,12 +302,46 @@ func (m *Metrics) Start() error {
 		return err
 	}
 
+	if m.retrievalErrorHTTPRemoteRequestNotFound, err = meter.Int64Counter(meterName+"/retrieval_error_http_remote_request_not_found_total",
+		instrument.WithDescription("The number of retrieval errors because an HTTP remote peer returned status 404 not found"),
+	); err != nil {
+		return err
+	}
+	if m.retrievalErrorHTTPRemoteRequestFailed, err = meter.Int64Counter(meterName+"/retrieval_error_http_remote_request_failed_total",
+		instrument.WithDescription("The number of retrieval errors because an HTTP remote peer returned a failed status other than 404"),
+	); err != nil {
+		return err
+	}
+
+	if m.retrievalErrorHTTPExtraneousBlock, err = meter.Int64Counter(meterName+"/retrieval_error_http_extraneous_block_total",
+		instrument.WithDescription("The number of retrieval errors where an HTTP remote returned extraneous blocks at the end of a CAR file"),
+	); err != nil {
+		return err
+	}
+
+	if m.retrievalErrorHTTPUnexpectedBlock, err = meter.Int64Counter(meterName+"/retrieval_error_http_unexpected_block_total",
+		instrument.WithDescription("The number of retrieval errors where an HTTP remote returned blocks that were out of order or incorrect in a CAR response"),
+	); err != nil {
+		return err
+	}
+
+	if m.retrievalErrorHTTPMissingBlock, err = meter.Int64Counter(meterName+"/retrieval_error_http_missing_block_total",
+		instrument.WithDescription("The number of retrieval errors where an HTTP remote never finished sending all blocks -- i.e. incomplete"),
+	); err != nil {
+		return err
+	}
+
+	if m.retrievalErrorHTTPMalformedCar, err = meter.Int64Counter(meterName+"/retrieval_error_http_malformed_car_total",
+		instrument.WithDescription("The number of retrieval errors where an HTTP remote returned a car which terminated early or had other issues"),
+	); err != nil {
+		return err
+	}
+
 	if m.retrievalErrorOtherCount, err = meter.Int64Counter(meterName+"/retrieval_error_other_total",
 		instrument.WithDescription("The number of retrieval errors with uncategorized causes"),
 	); err != nil {
 		return err
 	}
-
 	// averages
 	if m.indexerCandidatesPerRequestCount, err = meter.Int64Histogram(meterName+"/indexer_candidates_per_request_total",
 		instrument.WithDescription("The number of indexer candidates received per request"),
@@ -354,18 +388,24 @@ type stats struct {
 	retrievalDealSize        instrument.Int64Histogram
 
 	// error kinds
-	retrievalErrorRejectedCount     instrument.Int64Counter
-	retrievalErrorTooManyCount      instrument.Int64Counter
-	retrievalErrorACLCount          instrument.Int64Counter
-	retrievalErrorMaintenanceCount  instrument.Int64Counter
-	retrievalErrorNoOnlineCount     instrument.Int64Counter
-	retrievalErrorUnconfirmedCount  instrument.Int64Counter
-	retrievalErrorTimeoutCount      instrument.Int64Counter
-	retrievalErrorOtherCount        instrument.Int64Counter
-	retrievalErrorNoUnsealedCount   instrument.Int64Counter
-	retrievalErrorDAGStoreCount     instrument.Int64Counter
-	retrievalErrorGraphsyncCount    instrument.Int64Counter
-	retrievalErrorFailedToDialCount instrument.Int64Counter
+	retrievalErrorRejectedCount             instrument.Int64Counter
+	retrievalErrorTooManyCount              instrument.Int64Counter
+	retrievalErrorACLCount                  instrument.Int64Counter
+	retrievalErrorMaintenanceCount          instrument.Int64Counter
+	retrievalErrorNoOnlineCount             instrument.Int64Counter
+	retrievalErrorUnconfirmedCount          instrument.Int64Counter
+	retrievalErrorTimeoutCount              instrument.Int64Counter
+	retrievalErrorOtherCount                instrument.Int64Counter
+	retrievalErrorNoUnsealedCount           instrument.Int64Counter
+	retrievalErrorDAGStoreCount             instrument.Int64Counter
+	retrievalErrorGraphsyncCount            instrument.Int64Counter
+	retrievalErrorFailedToDialCount         instrument.Int64Counter
+	retrievalErrorHTTPRemoteRequestNotFound instrument.Int64Counter
+	retrievalErrorHTTPRemoteRequestFailed   instrument.Int64Counter
+	retrievalErrorHTTPExtraneousBlock       instrument.Int64Counter
+	retrievalErrorHTTPUnexpectedBlock       instrument.Int64Counter
+	retrievalErrorHTTPMissingBlock          instrument.Int64Counter
+	retrievalErrorHTTPMalformedCar          instrument.Int64Counter
 
 	// averages
 	indexerCandidatesPerRequestCount         instrument.Int64Histogram

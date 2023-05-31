@@ -249,23 +249,32 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 }
 
 func (m *Metrics) getMatchingErrorMetric(ctx context.Context, msg string) (instrument.Int64Counter, bool) {
-	var errorMetricMatches = map[string]instrument.Int64Counter{
-		"response rejected":                                 m.retrievalErrorRejectedCount,
-		"Too many retrieval deals received":                 m.retrievalErrorTooManyCount,
-		"Access Control":                                    m.retrievalErrorACLCount,
-		"Under maintenance, retry later":                    m.retrievalErrorMaintenanceCount,
-		"miner is not accepting online retrieval deals":     m.retrievalErrorNoOnlineCount,
-		"unconfirmed block transfer":                        m.retrievalErrorUnconfirmedCount,
-		"timeout after ":                                    m.retrievalErrorTimeoutCount,
-		"there is no unsealed piece containing payload cid": m.retrievalErrorNoUnsealedCount,
-		"getting pieces for cid":                            m.retrievalErrorDAGStoreCount,
-		"graphsync request failed to complete: request failed - unknown reason": m.retrievalErrorGraphsyncCount,
-		"failed to dial": m.retrievalErrorFailedToDialCount,
+	var errorMetricMatches = []struct {
+		substr string
+		metric instrument.Int64Counter
+	}{
+		{"response rejected", m.retrievalErrorRejectedCount},
+		{"Too many retrieval deals received", m.retrievalErrorTooManyCount},
+		{"Access Control", m.retrievalErrorACLCount},
+		{"Under maintenance, retry later", m.retrievalErrorMaintenanceCount},
+		{"miner is not accepting online retrieval deals", m.retrievalErrorNoOnlineCount},
+		{"unconfirmed block transfer", m.retrievalErrorUnconfirmedCount},
+		{"timeout after ", m.retrievalErrorTimeoutCount},
+		{"there is no unsealed piece containing payload cid", m.retrievalErrorNoUnsealedCount},
+		{"getting pieces for cid", m.retrievalErrorDAGStoreCount},
+		{"graphsync request failed to complete: request failed - unknown reason", m.retrievalErrorGraphsyncCount},
+		{"failed to dial", m.retrievalErrorFailedToDialCount},
+		{"HTTP request failed, remote response code: 404", m.retrievalErrorHTTPRemoteRequestNotFound},
+		{"HTTP request failed, remote response code:", m.retrievalErrorHTTPRemoteRequestFailed},
+		{"extraneous block in CAR", m.retrievalErrorHTTPExtraneousBlock},
+		{"unexpected block in CAR", m.retrievalErrorHTTPUnexpectedBlock},
+		{"missing block in CAR", m.retrievalErrorHTTPMissingBlock},
+		{"malformed CAR", m.retrievalErrorHTTPMalformedCar},
 	}
 
-	for substr, metric := range errorMetricMatches {
-		if strings.Contains(msg, substr) {
-			return metric, true
+	for _, match := range errorMetricMatches {
+		if strings.Contains(msg, match.substr) {
+			return match.metric, true
 		}
 	}
 
