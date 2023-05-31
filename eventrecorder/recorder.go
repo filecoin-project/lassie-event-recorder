@@ -187,7 +187,7 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			  storage_provider_id,
 			  time_to_first_byte,
 			  error,
-				protocol
+			  protocol
 		  )
 		  VALUES ($1, $2, $3, $4, $5)
 		  `
