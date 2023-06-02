@@ -127,6 +127,8 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 		INSERT INTO aggregate_retrieval_events(
 			instance_id,
 			retrieval_id,
+			root_cid,
+			url_path,
 			storage_provider_id,
 			time_to_first_byte,
 			bandwidth_bytes_sec,
@@ -141,11 +143,13 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			protocols_attempted,
 			protocol_succeeded
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		`
 		batchQuery.Queue(query,
 			event.InstanceID,
 			event.RetrievalID,
+			event.RootCid,
+			event.URLPath,
 			event.StorageProviderID,
 			timeToFirstByte,
 			event.Bandwidth,

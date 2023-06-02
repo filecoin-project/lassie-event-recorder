@@ -130,6 +130,8 @@ type AggregateEvent struct {
 	InstanceID        string    `json:"instanceId"`                  // The ID of the Lassie instance generating the event
 	RetrievalID       string    `json:"retrievalId"`                 // The unique ID of the retrieval
 	StorageProviderID string    `json:"storageProviderId,omitempty"` // The ID of the storage provider that served the retrieval content
+	RootCid           string    `json:"rootCid"`                     // The root cid being fetched
+	URLPath           string    `json:"urlPath"`                     // The path url after the root cid, including scope
 	TimeToFirstByte   string    `json:"timeToFirstByte,omitempty"`   // The time it took to receive the first byte in milliseconds
 	Bandwidth         uint64    `json:"bandwidth,omitempty"`         // The bandwidth of the retrieval in bytes per second
 	BytesTransferred  uint64    `json:"bytesTransferred,omitempty"`  // The total transmitted deal size
