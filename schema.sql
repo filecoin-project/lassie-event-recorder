@@ -13,7 +13,7 @@ create table if not exists retrieval_events(
 create table if not exists aggregate_retrieval_events(
   retrieval_id uuid not null UNIQUE,
   root_cid character varying(256),
-  url_path character varying(256),
+  url_path text,
   instance_id character varying(64) not null,
   storage_provider_id character varying(256),
   time_to_first_byte int8,
