@@ -226,7 +226,7 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 	if success {
 		protocol := protocolFromMulticodecString(protocolSucceeded)
 
-		m.requestWithSuccessCount.Add(ctx, 1)
+		m.requestWithSuccessCount.Add(ctx, 1, attribute.String("protocol", protocol))
 		switch protocol {
 		case ProtocolBitswap:
 			m.requestWithBitswapSuccessCount.Add(ctx, 1)
