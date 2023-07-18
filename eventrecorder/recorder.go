@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/filecoin-project/lassie-event-recorder/metrics"
+	"github.com/filecoin-project/lassie-event-recorder/spmap"
 	"github.com/filecoin-project/lassie/pkg/types"
 	"github.com/ipfs/go-log/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -24,6 +26,8 @@ type EventRecorder struct {
 
 	mongo *mongo.Client
 	mc    *mongo.Collection
+
+	pmap *spmap.SPMap
 }
 
 func New(opts ...Option) (*EventRecorder, error) {
@@ -34,6 +38,7 @@ func New(opts ...Option) (*EventRecorder, error) {
 
 	var recorder EventRecorder
 	recorder.cfg = cfg
+	recorder.pmap = spmap.NewSPMap(cfg.mapcfg...)
 	return &recorder, nil
 }
 
@@ -243,10 +248,18 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 				StartTime:         event.StartTime,
 				EndTime:           event.EndTime,
 			}
-			_, err := r.mc.InsertOne(ctx, report)
-			if err != nil {
-				logger.Infof("failed to report to mongo: %w", err)
-			}
+			go func(reportData RetrievalReport) {
+				var pid peer.ID
+				pid.UnmarshalText([]byte(reportData.StorageProviderID))
+				SPID, ok := <-r.pmap.Get(pid)
+				if ok {
+					reportData.SPID = SPID
+					_, err := r.mc.InsertOne(ctx, reportData)
+					if err != nil {
+						logger.Infof("failed to report to mongo: %w", err)
+					}
+				}
+			}(report)
 		}
 	}
 	batchResult := r.db.SendBatch(ctx, &batchQuery)
@@ -269,6 +282,7 @@ type RetrievalReport struct {
 	RetrievalID       string    `bson:"retrieval_id"`
 	InstanceID        string    `bson:"instance_id"`
 	StorageProviderID string    `bson:"storage_provider_id"`
+	SPID              string    `bson:"sp_id"`
 	TTFB              int64     `bson:"time_to_first_byte_ms"`
 	Bandwidth         int64     `bson:"bandwidth_bytes_sec"`
 	Success           bool      `bson:"success"`
@@ -311,4 +325,5 @@ func (r *EventRecorder) Shutdown() {
 			logger.Warn("failed to close mongo connection: %v", err)
 		}
 	}
+	r.pmap.Close()
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/lassie-event-recorder/metrics"
+	"github.com/filecoin-project/lassie-event-recorder/spmap"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -18,6 +19,8 @@ type (
 		mongoDB         string
 		mongoCollection string
 		mongoPercentile float32
+
+		mapcfg []spmap.Option
 
 		metrics *metrics.Metrics
 	}
