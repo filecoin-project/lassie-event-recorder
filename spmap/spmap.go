@@ -111,7 +111,6 @@ func (s *SPMap) run() {
 
 func (s *SPMap) Close() {
 	close(s.c)
-	s.c = nil
 }
 
 func (s *SPMap) Get(id peer.ID) chan string {
