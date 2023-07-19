@@ -251,7 +251,7 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			go func(reportData RetrievalReport) {
 				var pid peer.ID
 				pid.UnmarshalText([]byte(reportData.StorageProviderID))
-				SPID, ok := <-r.pmap.Get(pid)
+				SPID, ok := <-r.pmap.Get(ctx, pid)
 				if ok {
 					reportData.SPID = SPID
 					_, err := r.mc.InsertOne(ctx, reportData)

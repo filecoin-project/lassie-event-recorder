@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/filecoin-project/lassie v0.5.0
+	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-cid v0.3.2
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/jackc/pgx/v5 v5.3.1
@@ -44,7 +45,6 @@ require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/hannahhoward/cbor-gen-for v0.0.0-20230214144701-5d17c9d5243c // indirect
 	github.com/hannahhoward/go-pubsub v1.0.0 // indirect
-	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.1.0 // indirect
 	github.com/ipfs/go-block-format v0.1.1 // indirect
