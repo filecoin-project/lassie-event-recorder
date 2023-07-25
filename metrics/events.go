@@ -176,25 +176,25 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 		case ProtocolBitswap:
 			if !recordedBitswap {
 				recordedBitswap = true
-				m.requestWithBitswapAttempt.Add(ctx, 1)
+				m.requestWithBitswapAttempt.Add(ctx, 1, attribute.String("protocol", "bitswap"))
 			}
 		case ProtocolGraphsync:
 			if !recordedGraphSync {
 				recordedGraphSync = true
-				m.requestWithGraphSyncAttempt.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
+				m.requestWithGraphSyncAttempt.Add(ctx, 1, attribute.String("protocol", "graphsync"), attribute.String("sp_id", storageProviderID))
 			}
 		case ProtocolHttp:
 			if !recordedHttp {
 				recordedHttp = true
-				m.requestWithHttpAttempt.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
+				m.requestWithHttpAttempt.Add(ctx, 1, attribute.String("protocol", "http"), attribute.String("sp_id", storageProviderID))
 			}
 		}
 		if attempt.Error != "" {
 			switch protocolAttempted {
 			case ProtocolGraphsync:
-				m.graphsyncRetrievalFailureCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
+				m.graphsyncRetrievalFailureCount.Add(ctx, 1, attribute.String("protocol", "graphsync"), attribute.String("sp_id", storageProviderID))
 			case ProtocolHttp:
-				m.httpRetrievalFailureCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
+				m.httpRetrievalFailureCount.Add(ctx, 1, attribute.String("protocol", "http"), attribute.String("sp_id", storageProviderID))
 			default:
 			}
 			if metric, matched := m.getMatchingErrorMetric(ctx, attempt.Error); matched {
@@ -229,11 +229,11 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 		m.requestWithSuccessCount.Add(ctx, 1, attribute.String("protocol", protocol))
 		switch protocol {
 		case ProtocolBitswap:
-			m.requestWithBitswapSuccessCount.Add(ctx, 1)
+			m.requestWithBitswapSuccessCount.Add(ctx, 1, attribute.String("protocol", "bitswap"))
 		case ProtocolGraphsync:
-			m.requestWithGraphSyncSuccessCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
+			m.requestWithGraphSyncSuccessCount.Add(ctx, 1, attribute.String("protocol", "graphsync"), attribute.String("sp_id", storageProviderID))
 		case ProtocolHttp:
-			m.requestWithHttpSuccessCount.Add(ctx, 1, attribute.String("sp_id", storageProviderID))
+			m.requestWithHttpSuccessCount.Add(ctx, 1, attribute.String("protocol", "http"), attribute.String("sp_id", storageProviderID))
 		}
 
 		m.retrievalDealDuration.Record(ctx, endTime.Sub(startTime).Seconds(), attribute.String("protocol", protocol))
