@@ -105,6 +105,7 @@ func (s *SPMap) query(ctx context.Context, id peer.ID) []string {
 		logger.Warnf("failed to decode response from heyfil: %w", err)
 		return nil
 	}
+	logger.Infof("heyfil mapped %d sps for peerID %s", len(sps), id.String())
 	return sps
 }
 
