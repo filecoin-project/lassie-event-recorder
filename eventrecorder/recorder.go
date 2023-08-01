@@ -249,12 +249,14 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 				EndTime:           event.EndTime,
 			}
 			go func(reportData RetrievalReport) {
+				mongoReportCtx, cncl := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cncl()
 				var pid peer.ID
 				pid.UnmarshalText([]byte(reportData.StorageProviderID))
-				SPID, ok := <-r.pmap.Get(ctx, pid)
+				SPID, ok := <-r.pmap.Get(mongoReportCtx, pid)
 				if ok {
 					reportData.SPID = SPID
-					_, err := r.mc.InsertOne(ctx, reportData)
+					_, err := r.mc.InsertOne(mongoReportCtx, reportData)
 					if err != nil {
 						logger.Infof("failed to report to mongo: %w", err)
 					}
