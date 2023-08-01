@@ -252,7 +252,10 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 				mongoReportCtx, cncl := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cncl()
 				var pid peer.ID
-				pid.UnmarshalText([]byte(reportData.StorageProviderID))
+				if err := pid.UnmarshalText([]byte(reportData.StorageProviderID)); err != nil {
+					logger.Warnf("could not parse spid %s: %s", reportData.StorageProviderID, err)
+					return
+				}
 				SPID, ok := <-r.pmap.Get(mongoReportCtx, pid)
 				if ok {
 					reportData.SPID = SPID
