@@ -16,7 +16,7 @@ import (
 
 var logger = log.Logger("lassie/spmap")
 
-type Option func(spConfig)
+type Option func(*spConfig)
 
 func NewSPMap(opts ...Option) *SPMap {
 	cf := spConfig{
@@ -24,7 +24,7 @@ func NewSPMap(opts ...Option) *SPMap {
 		client:         http.DefaultClient,
 	}
 	for _, o := range opts {
-		o(cf)
+		o(&cf)
 	}
 	arc, err := lru.NewARC(10_000)
 	if err != nil {
@@ -46,13 +46,13 @@ type spConfig struct {
 }
 
 func WithHeyFil(endpoint string) Option {
-	return func(sc spConfig) {
+	return func(sc *spConfig) {
 		sc.heyFilEndpoint = endpoint
 	}
 }
 
 func WithClient(c *http.Client) Option {
-	return func(sc spConfig) {
+	return func(sc *spConfig) {
 		sc.client = c
 	}
 }
