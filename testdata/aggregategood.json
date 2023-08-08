@@ -1,0 +1,95 @@
+    {
+        "events": [
+            {
+                "bandwidth": 200000,
+                "bytesTransferred": 10000,
+                "endTime": "1970-01-01T10:00:00.09+10:00",
+                "indexerCandidatesFiltered": 3,
+                "indexerCandidatesReceived": 5,
+                "instanceId": "test-instance",
+                "protocolSucceeded": "transport-bitswap",
+                "protocolsAllowed": [
+                    "transport-graphsync-filecoinv1",
+                    "transport-bitswap"
+                ],
+                "protocolsAttempted": [
+                    "transport-graphsync-filecoinv1",
+                    "transport-bitswap"
+                ],
+                "retrievalAttempts": {
+                    "12D3KooWEqwTBN3GE4vT6DWZiKpq24UtSBmhhwM73vg7SfTjYWaF": {
+                        "protocol": "transport-graphsync-filecoinv1",
+                        "timeToFirstByte": "50ms"
+                    },
+                    "12D3KooWHHzSeKaY8xuZVzkLbKFfvNgPPeKhFBGrMbNzbm5akpqu": {
+                        "error": "failed to dial",
+                        "protocol": "transport-graphsync-filecoinv1"
+                    },
+                    "Bitswap": {
+                        "protocol": "transport-bitswap",
+                        "timeToFirstByte": "20ms"
+                    }
+                },
+                "retrievalId": "c8490080-b86f-4306-a657-a0b88ac43832",
+                "rootCid": "QmTTA2daxGqo5denp6SwLzzkLJm3fuisYEi9CoWsuHpzfb",
+                "startTime": "1970-01-01T10:00:00+10:00",
+                "storageProviderId": "Bitswap",
+                "success": true,
+                "timeToFirstByte": "40ms",
+                "timeToFirstIndexerResult": "10ms",
+                "urlPath": "/applesauce"
+            },
+            {
+                "endTime": "1970-01-01T10:00:00+10:00",
+                "indexerCandidatesFiltered": 0,
+                "indexerCandidatesReceived": 0,
+                "instanceId": "test-instance",
+                "retrievalId": "5f06fd27-36db-47f8-a0f5-ef20bd0ae4b5",
+                "rootCid": "QmTTA2daxGqo5denp6SwLzzkLJm3fuisYEi9CoWsuHpzfb",
+                "startTime": "1970-01-01T10:00:00+10:00",
+                "success": false,
+                "urlPath": "/applesauce"
+            },
+            {
+                "bandwidth": 300000,
+                "bytesTransferred": 20000,
+                "endTime": "1970-01-01T10:00:00.18+10:00",
+                "indexerCandidatesFiltered": 6,
+                "indexerCandidatesReceived": 10,
+                "instanceId": "test-instance",
+                "protocolSucceeded": "transport-ipfs-gateway-http",
+                "protocolsAllowed": [
+                    "transport-ipfs-gateway-http",
+                    "transport-graphsync-filecoinv1",
+                    "transport-bitswap"
+                ],
+                "protocolsAttempted": [
+                    "transport-ipfs-gateway-http",
+                    "transport-graphsync-filecoinv1",
+                    "transport-bitswap"
+                ],
+                "retrievalAttempts": {
+                    "12D3KooWDGBkHBZye7rN6Pz9ihEZrHnggoVRQh6eEtKP4z1K4KeE": {
+                        "protocol": "transport-ipfs-gateway-http",
+                        "timeToFirstByte": "100ms"
+                    },
+                    "12D3KooWHHzSeKaY8xuZVzkLbKFfvNgPPeKhFBGrMbNzbm5akpqu": {
+                        "error": "failed to dial",
+                        "protocol": "transport-graphsync-filecoinv1"
+                    },
+                    "Bitswap": {
+                        "protocol": "transport-bitswap",
+                        "timeToFirstByte": "200ms"
+                    }
+                },
+                "retrievalId": "c8490080-b86f-4306-a657-a0b88ac43834",
+                "rootCid": "QmTTA2daxGqo5denp6SwLzzkLJm3fuisYEi9CoWsuHpzfb",
+                "startTime": "1970-01-01T10:00:00.02+10:00",
+                "storageProviderId": "12D3KooWDGBkHBZye7rN6Pz9ihEZrHnggoVRQh6eEtKP4z1K4KeE",
+                "success": true,
+                "timeToFirstByte": "80ms",
+                "timeToFirstIndexerResult": "20ms",
+                "urlPath": "/applesauce"
+            }
+        ]
+    }

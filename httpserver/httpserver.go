@@ -15,9 +15,9 @@ import (
 var logger = log.Logger("lassie/httpserver")
 
 type HttpServer struct {
-	cfg      *config
-	recorder *eventrecorder.EventRecorder
-	server   *http.Server
+	cfg     *config
+	server  *http.Server
+	handler *HttpHandler
 }
 
 func NewHttpServer(recorder *eventrecorder.EventRecorder, opts ...option) (*HttpServer, error) {
@@ -28,9 +28,10 @@ func NewHttpServer(recorder *eventrecorder.EventRecorder, opts ...option) (*Http
 
 	var httpServer HttpServer
 	httpServer.cfg = cfg
+	httpServer.handler = NewHttpHandler(recorder)
 	httpServer.server = &http.Server{
 		Addr:              httpServer.cfg.httpServerListenAddr,
-		Handler:           httpServer.httpServerMux(),
+		Handler:           httpServer.handler.Handler(),
 		ReadTimeout:       httpServer.cfg.httpServerReadTimeout,
 		ReadHeaderTimeout: httpServer.cfg.httpServerReadHeaderTimeout,
 		WriteTimeout:      httpServer.cfg.httpServerWriteTimeout,
@@ -38,43 +39,59 @@ func NewHttpServer(recorder *eventrecorder.EventRecorder, opts ...option) (*Http
 		MaxHeaderBytes:    httpServer.cfg.httpServerMaxHeaderBytes,
 	}
 
-	httpServer.recorder = recorder
-
 	return &httpServer, nil
 }
 
-func (h HttpServer) Start(ctx context.Context) error {
-	ln, err := net.Listen("tcp", h.server.Addr)
+func (hs HttpServer) Start(ctx context.Context) error {
+	ln, err := net.Listen("tcp", hs.server.Addr)
 	if err != nil {
 		return err
 	}
 
 	// Start the event recorder
-	h.recorder.Start(ctx)
+	if err := hs.handler.Start(ctx); err != nil {
+		return err
+	}
 
 	// Shutdown the event recorder when the server shutdowns
-	h.server.RegisterOnShutdown(func() {
-		h.recorder.Shutdown()
+	hs.server.RegisterOnShutdown(func() {
+		hs.handler.Shutdown()
 	})
 
-	go func() { _ = h.server.Serve(ln) }()
+	go func() { _ = hs.server.Serve(ln) }()
 	logger.Infow("Server started", "addr", ln.Addr())
 	return nil
 }
 
-func (h HttpServer) Shutdown(ctx context.Context) error {
-	return h.server.Shutdown(ctx)
+func (hs HttpServer) Shutdown(ctx context.Context) error {
+	return hs.server.Shutdown(ctx)
 }
 
-func (r *HttpServer) httpServerMux() *http.ServeMux {
+type HttpHandler struct {
+	recorder *eventrecorder.EventRecorder
+}
+
+func NewHttpHandler(recorder *eventrecorder.EventRecorder) *HttpHandler {
+	return &HttpHandler{recorder}
+}
+
+func (hh HttpHandler) Start(ctx context.Context) error {
+	return hh.recorder.Start(ctx)
+}
+
+func (hh HttpHandler) Shutdown() {
+	hh.recorder.Shutdown()
+}
+
+func (hh *HttpHandler) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/retrieval-events", r.handleRetrievalEvents)
-	mux.HandleFunc("/v2/retrieval-events", r.handleRetrievalEventsV2)
-	mux.HandleFunc("/ready", r.handleReady)
+	mux.HandleFunc("/v1/retrieval-events", hh.handleRetrievalEvents)
+	mux.HandleFunc("/v2/retrieval-events", hh.handleRetrievalEventsV2)
+	mux.HandleFunc("/ready", hh.handleReady)
 	return mux
 }
 
-func (h *HttpServer) handleRetrievalEvents(res http.ResponseWriter, req *http.Request) {
+func (hh *HttpHandler) handleRetrievalEvents(res http.ResponseWriter, req *http.Request) {
 	logger := logger.With("method", req.Method, "path", req.URL.Path)
 	if req.Method != http.MethodPost {
 		res.Header().Add("Allow", http.MethodPost)
@@ -106,14 +123,14 @@ func (h *HttpServer) handleRetrievalEvents(res http.ResponseWriter, req *http.Re
 		return
 	}
 
-	err := h.recorder.RecordEvents(req.Context(), batch.Events)
+	err := hh.recorder.RecordEvents(req.Context(), batch.Events)
 	if err != nil {
 		http.Error(res, "", http.StatusInternalServerError)
 		return
 	}
 }
 
-func (h *HttpServer) handleRetrievalEventsV2(res http.ResponseWriter, req *http.Request) {
+func (hh *HttpHandler) handleRetrievalEventsV2(res http.ResponseWriter, req *http.Request) {
 	logger := logger.With("method", req.Method, "path", req.URL.Path)
 	if req.Method != http.MethodPost {
 		res.Header().Add("Allow", http.MethodPost)
@@ -145,14 +162,14 @@ func (h *HttpServer) handleRetrievalEventsV2(res http.ResponseWriter, req *http.
 		return
 	}
 
-	err := h.recorder.RecordAggregateEvents(req.Context(), batch.Events)
+	err := hh.recorder.RecordAggregateEvents(req.Context(), batch.Events)
 	if err != nil {
 		http.Error(res, "", http.StatusInternalServerError)
 		return
 	}
 }
 
-func (r *HttpServer) handleReady(res http.ResponseWriter, req *http.Request) {
+func (hh *HttpHandler) handleReady(res http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
 		// TODO: ping DB as part of readiness check?
