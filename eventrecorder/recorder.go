@@ -217,12 +217,16 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 				return nil
 			})
 		}
+
+		filSPID := r.lassieSPIDToFilecoinSPID(ctx, event.StorageProviderID)
+
 		if r.cfg.metrics != nil {
 			r.cfg.metrics.HandleAggregatedEvent(ctx,
 				timeToFirstIndexerResult,
 				timeToFirstByte,
 				event.Success,
 				event.StorageProviderID,
+				filSPID,
 				event.StartTime,
 				event.EndTime,
 				int64(event.Bandwidth),
@@ -234,10 +238,7 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			)
 		}
 
-		if r.mc != nil &&
-			rand.Float32() < r.cfg.mongoPercentile &&
-			event.StorageProviderID != "Bitswap" &&
-			event.StorageProviderID != "" {
+		if r.mc != nil && filSPID != "" && rand.Float32() < r.cfg.mongoPercentile {
 			report := RetrievalReport{
 				RetrievalID:       event.RetrievalID,
 				InstanceID:        event.InstanceID,
@@ -251,18 +252,10 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			go func(reportData RetrievalReport) {
 				mongoReportCtx, cncl := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cncl()
-				var pid peer.ID
-				if err := pid.UnmarshalText([]byte(reportData.StorageProviderID)); err != nil {
-					logger.Warnf("could not parse spid %s: %s", reportData.StorageProviderID, err)
-					return
-				}
-				SPID, ok := <-r.pmap.Get(mongoReportCtx, pid)
-				if ok {
-					reportData.SPID = SPID
-					_, err := r.mc.InsertOne(mongoReportCtx, reportData)
-					if err != nil {
-						logger.Infof("failed to report to mongo: %w", err)
-					}
+				reportData.SPID = filSPID
+				_, err := r.mc.InsertOne(mongoReportCtx, reportData)
+				if err != nil {
+					logger.Infof("failed to report to mongo: %w", err)
 				}
 			}(report)
 		}
@@ -283,11 +276,23 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 	return nil
 }
 
+func (r *EventRecorder) lassieSPIDToFilecoinSPID(ctx context.Context, lassieSPID string) string {
+	if lassieSPID == "" || lassieSPID == "Bitswap" {
+		return ""
+	}
+	var pid peer.ID
+	if err := pid.UnmarshalText([]byte(lassieSPID)); err != nil {
+		logger.Warnf("could not parse lassie spid %s: %s", lassieSPID, err)
+		return ""
+	}
+	return <-r.pmap.Get(ctx, pid)
+}
+
 type RetrievalReport struct {
 	RetrievalID       string    `bson:"retrieval_id"`
 	InstanceID        string    `bson:"instance_id"`
-	StorageProviderID string    `bson:"storage_provider_id"`
-	SPID              string    `bson:"sp_id"`
+	StorageProviderID string    `bson:"storage_provider_id"` // Lassie Peer ID
+	SPID              string    `bson:"sp_id"`               // Heyfil Filecoin SP ID
 	TTFB              int64     `bson:"time_to_first_byte_ms"`
 	Bandwidth         int64     `bson:"bandwidth_bytes_sec"`
 	Success           bool      `bson:"success"`
