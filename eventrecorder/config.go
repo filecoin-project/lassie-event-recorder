@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/filecoin-project/lassie-event-recorder/metrics"
 	"github.com/filecoin-project/lassie-event-recorder/spmap"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -22,7 +21,7 @@ type (
 
 		mapcfg []spmap.Option
 
-		metrics *metrics.Metrics
+		metrics Metrics
 	}
 	Option func(*config) error
 )
@@ -34,13 +33,14 @@ func newConfig(opts []Option) (*config, error) {
 			return nil, err
 		}
 	}
-
-	if cfg.dbDSN == "" {
-		return nil, errors.New("db URL must be specified")
+	if cfg.dbDSN != "" {
+		var err error
+		if cfg.pgxPoolConfig, err = pgxpool.ParseConfig(cfg.dbDSN); err != nil {
+			return nil, fmt.Errorf("unable to parse db URL: %w", err)
+		}
 	}
-	var err error
-	if cfg.pgxPoolConfig, err = pgxpool.ParseConfig(cfg.dbDSN); err != nil {
-		return nil, fmt.Errorf("unable to parse db URL: %w", err)
+	if cfg.pgxPoolConfig == nil && cfg.metrics == nil && cfg.mongoEndpoint == "" {
+		return nil, errors.New("must set up at least one of: postgres, mongo, metrics")
 	}
 	return cfg, nil
 }
@@ -62,9 +62,16 @@ func WithMongoSubmissions(endpoint, db, collection string, percentage float32) O
 	}
 }
 
-func WithMetrics(metrics *metrics.Metrics) Option {
+func WithMetrics(metrics Metrics) Option {
 	return func(cfg *config) error {
 		cfg.metrics = metrics
+		return nil
+	}
+}
+
+func WithSPMapOptions(opts ...spmap.Option) Option {
+	return func(cfg *config) error {
+		cfg.mapcfg = opts
 		return nil
 	}
 }

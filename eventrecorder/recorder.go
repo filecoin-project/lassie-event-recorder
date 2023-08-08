@@ -20,6 +20,32 @@ import (
 
 var logger = log.Logger("lassie/eventrecorder")
 
+type Metrics interface {
+	HandleStartedEvent(context.Context, types.RetrievalID, types.Phase, time.Time, string)
+	HandleCandidatesFoundEvent(context.Context, types.RetrievalID, time.Time, any)
+	HandleCandidatesFilteredEvent(context.Context, types.RetrievalID, any)
+	HandleFailureEvent(context.Context, types.RetrievalID, types.Phase, string, any)
+	HandleTimeToFirstByteEvent(context.Context, types.RetrievalID, string, time.Time)
+	HandleSuccessEvent(context.Context, types.RetrievalID, time.Time, string, any)
+
+	HandleAggregatedEvent(
+		ctx context.Context,
+		timeToFirstIndexerResult time.Duration,
+		timeToFirstByte time.Duration,
+		success bool,
+		storageProviderID string, // Lassie Peer ID
+		filSPID string, // Heyfil Filecoin SP ID
+		startTime time.Time,
+		endTime time.Time,
+		bandwidth int64,
+		bytesTransferred int64,
+		indexerCandidates int64,
+		indexerFiltered int64,
+		attempts map[string]metrics.Attempt,
+		protocolSucceeded string,
+	)
+}
+
 type EventRecorder struct {
 	cfg *config
 	db  *pgxpool.Pool
@@ -43,6 +69,10 @@ func New(opts ...Option) (*EventRecorder, error) {
 }
 
 func (r *EventRecorder) RecordEvents(ctx context.Context, events []Event) error {
+	if r.db == nil {
+		return nil
+	}
+
 	totalLogger := logger.With("total", len(events))
 
 	var batchQuery pgx.Batch
@@ -180,7 +210,6 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 		})
 		attempts := make(map[string]metrics.Attempt, len(event.RetrievalAttempts))
 		for storageProviderID, retrievalAttempt := range event.RetrievalAttempts {
-
 			var timeToFirstByte time.Duration
 			if retrievalAttempt.TimeToFirstByte != "" {
 				timeToFirstByte, _ = time.ParseDuration(retrievalAttempt.TimeToFirstByte)
@@ -242,7 +271,8 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			report := RetrievalReport{
 				RetrievalID:       event.RetrievalID,
 				InstanceID:        event.InstanceID,
-				StorageProviderID: event.StorageProviderID,
+				StorageProviderID: event.StorageProviderID, // Lassie Peer ID
+				SPID:              filSPID,                 // Heyfil Filecoin SP ID
 				TTFB:              timeToFirstByte.Milliseconds(),
 				Bandwidth:         int64(event.Bandwidth),
 				Success:           event.Success,
@@ -252,27 +282,29 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			go func(reportData RetrievalReport) {
 				mongoReportCtx, cncl := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cncl()
-				reportData.SPID = filSPID
-				_, err := r.mc.InsertOne(mongoReportCtx, reportData)
-				if err != nil {
+				if _, err := r.mc.InsertOne(mongoReportCtx, reportData); err != nil {
 					logger.Infof("failed to report to mongo: %w", err)
 				}
 			}(report)
 		}
 	}
-	batchResult := r.db.SendBatch(ctx, &batchQuery)
-	err := batchResult.Close()
-	if err != nil {
-		totalLogger.Errorw("At least one aggregated event insertion failed", "err", err)
-		return err
+
+	if r.db != nil {
+		batchResult := r.db.SendBatch(ctx, &batchQuery)
+		err := batchResult.Close()
+		if err != nil {
+			totalLogger.Errorw("At least one aggregated event insertion failed", "err", err)
+			return err
+		}
+		batchResult = r.db.SendBatch(ctx, &batchRetrievalAttempts)
+		err = batchResult.Close()
+		if err != nil {
+			totalLogger.Errorw("At least one retrieval attempt insertion failed", "err", err)
+			return err
+		}
+		totalLogger.Info("Successfully submitted batch event insertion")
 	}
-	batchResult = r.db.SendBatch(ctx, &batchRetrievalAttempts)
-	err = batchResult.Close()
-	if err != nil {
-		totalLogger.Errorw("At least one retrieval attempt insertion failed", "err", err)
-		return err
-	}
-	totalLogger.Info("Successfully submitted batch event insertion")
+
 	return nil
 }
 
@@ -302,9 +334,11 @@ type RetrievalReport struct {
 
 func (r *EventRecorder) Start(ctx context.Context) error {
 	var err error
-	r.db, err = pgxpool.NewWithConfig(ctx, r.cfg.pgxPoolConfig)
-	if err != nil {
-		return fmt.Errorf("failed to instantiate database connection: %w", err)
+	if r.cfg.pgxPoolConfig != nil {
+		r.db, err = pgxpool.NewWithConfig(ctx, r.cfg.pgxPoolConfig)
+		if err != nil {
+			return fmt.Errorf("failed to instantiate database connection: %w", err)
+		}
 	}
 
 	if r.cfg.mongoEndpoint != "" {
@@ -324,8 +358,10 @@ func (r *EventRecorder) Start(ctx context.Context) error {
 }
 
 func (r *EventRecorder) Shutdown() {
-	logger.Info("Closing database connection...")
-	r.db.Close()
+	if r.db != nil {
+		logger.Info("Closing database connection...")
+		r.db.Close()
+	}
 	logger.Info("Database connection closed successfully.")
 	if r.mongo != nil {
 		timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
