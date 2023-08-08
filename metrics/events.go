@@ -156,7 +156,8 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 	timeToFirstIndexerResult time.Duration,
 	timeToFirstByte time.Duration,
 	success bool,
-	storageProviderID string,
+	storageProviderID string, // Lassie Peer ID
+	filSPID string, // Heyfil Filecoin SP ID
 	startTime time.Time,
 	endTime time.Time,
 	bandwidth int64,
@@ -226,14 +227,14 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 	if success {
 		protocol := protocolFromMulticodecString(protocolSucceeded)
 
-		m.requestWithSuccessCount.Add(ctx, 1, attribute.String("protocol", protocol))
+		m.requestWithSuccessCount.Add(ctx, 1, attribute.String("protocol", protocol), attribute.String("fil_sp_id", filSPID))
 		switch protocol {
 		case ProtocolBitswap:
 			m.requestWithBitswapSuccessCount.Add(ctx, 1, attribute.String("protocol", "bitswap"))
 		case ProtocolGraphsync:
-			m.requestWithGraphSyncSuccessCount.Add(ctx, 1, attribute.String("protocol", "graphsync"), attribute.String("sp_id", storageProviderID))
+			m.requestWithGraphSyncSuccessCount.Add(ctx, 1, attribute.String("protocol", "graphsync"), attribute.String("sp_id", storageProviderID), attribute.String("fil_sp_id", filSPID))
 		case ProtocolHttp:
-			m.requestWithHttpSuccessCount.Add(ctx, 1, attribute.String("protocol", "http"), attribute.String("sp_id", storageProviderID))
+			m.requestWithHttpSuccessCount.Add(ctx, 1, attribute.String("protocol", "http"), attribute.String("sp_id", storageProviderID), attribute.String("fil_sp_id", filSPID))
 		}
 
 		m.retrievalDealDuration.Record(ctx, endTime.Sub(startTime).Seconds(), attribute.String("protocol", protocol))
