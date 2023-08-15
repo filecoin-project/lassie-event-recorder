@@ -147,6 +147,7 @@ func (m *Metrics) HandleSuccessEvent(ctx context.Context, id types.RetrievalID, 
 }
 
 type Attempt struct {
+	FilSPID         string
 	Error           string
 	Protocol        string
 	TimeToFirstByte time.Duration
@@ -182,20 +183,20 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 		case ProtocolGraphsync:
 			if !recordedGraphSync {
 				recordedGraphSync = true
-				m.requestWithGraphSyncAttempt.Add(ctx, 1, attribute.String("protocol", "graphsync"), attribute.String("sp_id", storageProviderID))
+				m.requestWithGraphSyncAttempt.Add(ctx, 1, attribute.String("protocol", "graphsync"), attribute.String("sp_id", storageProviderID), attribute.String("fil_sp_id", attempt.FilSPID))
 			}
 		case ProtocolHttp:
 			if !recordedHttp {
 				recordedHttp = true
-				m.requestWithHttpAttempt.Add(ctx, 1, attribute.String("protocol", "http"), attribute.String("sp_id", storageProviderID))
+				m.requestWithHttpAttempt.Add(ctx, 1, attribute.String("protocol", "http"), attribute.String("sp_id", storageProviderID), attribute.String("fil_sp_id", attempt.FilSPID))
 			}
 		}
 		if attempt.Error != "" {
 			switch protocolAttempted {
 			case ProtocolGraphsync:
-				m.graphsyncRetrievalFailureCount.Add(ctx, 1, attribute.String("protocol", "graphsync"), attribute.String("sp_id", storageProviderID))
+				m.graphsyncRetrievalFailureCount.Add(ctx, 1, attribute.String("protocol", "graphsync"), attribute.String("sp_id", storageProviderID), attribute.String("fil_sp_id", attempt.FilSPID))
 			case ProtocolHttp:
-				m.httpRetrievalFailureCount.Add(ctx, 1, attribute.String("protocol", "http"), attribute.String("sp_id", storageProviderID))
+				m.httpRetrievalFailureCount.Add(ctx, 1, attribute.String("protocol", "http"), attribute.String("sp_id", storageProviderID), attribute.String("fil_sp_id", attempt.FilSPID))
 			default:
 			}
 			if metric, matched := m.getMatchingErrorMetric(ctx, attempt.Error); matched {
@@ -227,7 +228,7 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 	if success {
 		protocol := protocolFromMulticodecString(protocolSucceeded)
 
-		m.requestWithSuccessCount.Add(ctx, 1, attribute.String("protocol", protocol), attribute.String("fil_sp_id", filSPID))
+		m.requestWithSuccessCount.Add(ctx, 1, attribute.String("protocol", protocol), attribute.String("sp_id", storageProviderID), attribute.String("fil_sp_id", filSPID))
 		switch protocol {
 		case ProtocolBitswap:
 			m.requestWithBitswapSuccessCount.Add(ctx, 1, attribute.String("protocol", "bitswap"))
