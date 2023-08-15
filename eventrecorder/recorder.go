@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/filecoin-project/lassie-event-recorder/metrics"
@@ -208,49 +209,65 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			}
 			return nil
 		})
+
 		attempts := make(map[string]metrics.Attempt, len(event.RetrievalAttempts))
+		var wg sync.WaitGroup
+		var lk sync.Mutex
 		for storageProviderID, retrievalAttempt := range event.RetrievalAttempts {
-			var timeToFirstByte time.Duration
-			if retrievalAttempt.TimeToFirstByte != "" {
-				timeToFirstByte, _ = time.ParseDuration(retrievalAttempt.TimeToFirstByte)
-			}
-			attempts[storageProviderID] = metrics.Attempt{
-				Error:           retrievalAttempt.Error,
-				Protocol:        retrievalAttempt.Protocol,
-				TimeToFirstByte: timeToFirstByte,
-			}
-			query := `
-		  INSERT INTO retrieval_attempts(
-			  retrieval_id,
-			  storage_provider_id,
-			  time_to_first_byte,
-			  error,
-			  protocol
-		  )
-		  VALUES ($1, $2, $3, $4, $5)
-		  `
-			batchRetrievalAttempts.Queue(query,
-				event.RetrievalID,
-				storageProviderID,
-				timeToFirstByte,
-				retrievalAttempt.Error,
-				retrievalAttempt.Protocol,
-			).Exec(func(ct pgconn.CommandTag) error {
-				rowsAffected := ct.RowsAffected()
-				switch rowsAffected {
-				case 0:
-					totalLogger.Warnw("Retrieval attempt insertion did not affect any rows", "retrievalID", event.RetrievalID, "retrievalAttempt", retrievalAttempt, "storageProviderID", storageProviderID, "rowsAffected", rowsAffected)
-				default:
-					totalLogger.Debugw("Inserted retrieval attempt successfully", "retrievalID", event.RetrievalID, "retrievalAttempt", retrievalAttempt, "storageProviderID", storageProviderID, "rowsAffected", rowsAffected)
+			wg.Add(1)
+			go func(storageProviderID string, retrievalAttempt *RetrievalAttempt) {
+				defer wg.Done()
+
+				var timeToFirstByte time.Duration
+				if retrievalAttempt.TimeToFirstByte != "" {
+					timeToFirstByte, _ = time.ParseDuration(retrievalAttempt.TimeToFirstByte)
 				}
-				return nil
-			})
+				filSPID := r.lassieSPIDToFilecoinSPID(ctx, storageProviderID) // call to Heyfil, may block if unknown SPID
+
+				lk.Lock()
+				defer lk.Unlock()
+				attempts[storageProviderID] = metrics.Attempt{
+					FilSPID:         filSPID,
+					Error:           retrievalAttempt.Error,
+					Protocol:        retrievalAttempt.Protocol,
+					TimeToFirstByte: timeToFirstByte,
+				}
+				query := `
+			  INSERT INTO retrieval_attempts(
+				  retrieval_id,
+				  storage_provider_id,
+				  time_to_first_byte,
+				  error,
+				  protocol
+			  )
+			  VALUES ($1, $2, $3, $4, $5)
+			  `
+				batchRetrievalAttempts.Queue(query,
+					event.RetrievalID,
+					storageProviderID,
+					timeToFirstByte,
+					retrievalAttempt.Error,
+					retrievalAttempt.Protocol,
+				).Exec(func(ct pgconn.CommandTag) error {
+					rowsAffected := ct.RowsAffected()
+					switch rowsAffected {
+					case 0:
+						totalLogger.Warnw("Retrieval attempt insertion did not affect any rows", "retrievalID", event.RetrievalID, "retrievalAttempt", retrievalAttempt, "storageProviderID", storageProviderID, "rowsAffected", rowsAffected)
+					default:
+						totalLogger.Debugw("Inserted retrieval attempt successfully", "retrievalID", event.RetrievalID, "retrievalAttempt", retrievalAttempt, "storageProviderID", storageProviderID, "rowsAffected", rowsAffected)
+					}
+					return nil
+				})
+			}(storageProviderID, retrievalAttempt)
 		}
 
 		filSPID := r.lassieSPIDToFilecoinSPID(ctx, event.StorageProviderID)
 
+		wg.Wait()
+
 		if r.cfg.metrics != nil {
-			r.cfg.metrics.HandleAggregatedEvent(ctx,
+			r.cfg.metrics.HandleAggregatedEvent(
+				ctx,
 				timeToFirstIndexerResult,
 				timeToFirstByte,
 				event.Success,
