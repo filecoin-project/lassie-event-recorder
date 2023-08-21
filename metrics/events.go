@@ -267,6 +267,7 @@ func (m *Metrics) getMatchingErrorMetric(ctx context.Context, msg string) (instr
 		{"graphsync request failed to complete: request failed - unknown reason", m.retrievalErrorGraphsyncCount},
 		{"failed to dial", m.retrievalErrorFailedToDialCount},
 		{"HTTP request failed, remote response code: 404", m.retrievalErrorHTTPRemoteRequestNotFound},
+		{"HTTP request failed, remote response code: 410", m.retrievalErrorHTTPRemoteRequestGone},
 		{"HTTP request failed, remote response code:", m.retrievalErrorHTTPRemoteRequestFailed},
 		{"extraneous block in CAR", m.retrievalErrorHTTPExtraneousBlock},
 		{"unexpected block in CAR", m.retrievalErrorHTTPUnexpectedBlock},
