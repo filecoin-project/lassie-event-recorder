@@ -307,6 +307,11 @@ func (m *Metrics) Start() error {
 	); err != nil {
 		return err
 	}
+	if m.retrievalErrorHTTPRemoteRequestGone, err = meter.Int64Counter(meterName+"/retrieval_error_http_remote_request_gone_total",
+		instrument.WithDescription("The number of retrieval errors because an HTTP remote peer returned status 410 gone"),
+	); err != nil {
+		return err
+	}
 	if m.retrievalErrorHTTPRemoteRequestFailed, err = meter.Int64Counter(meterName+"/retrieval_error_http_remote_request_failed_total",
 		instrument.WithDescription("The number of retrieval errors because an HTTP remote peer returned a failed status other than 404"),
 	); err != nil {
@@ -401,6 +406,7 @@ type stats struct {
 	retrievalErrorGraphsyncCount            instrument.Int64Counter
 	retrievalErrorFailedToDialCount         instrument.Int64Counter
 	retrievalErrorHTTPRemoteRequestNotFound instrument.Int64Counter
+	retrievalErrorHTTPRemoteRequestGone     instrument.Int64Counter
 	retrievalErrorHTTPRemoteRequestFailed   instrument.Int64Counter
 	retrievalErrorHTTPExtraneousBlock       instrument.Int64Counter
 	retrievalErrorHTTPUnexpectedBlock       instrument.Int64Counter
