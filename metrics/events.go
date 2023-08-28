@@ -169,27 +169,17 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 	protocolSucceeded string) {
 	m.totalRequestCount.Add(ctx, 1)
 	failureCount := 0
-	var recordedGraphSync, recordedBitswap, recordedHttp bool
 	var lowestTTFB time.Duration
 	var lowestTTFBProtocol string
 	for storageProviderID, attempt := range attempts {
 		protocolAttempted := protocolFromMulticodecString(attempt.Protocol)
 		switch protocolAttempted {
 		case ProtocolBitswap:
-			if !recordedBitswap {
-				recordedBitswap = true
-				m.requestWithBitswapAttempt.Add(ctx, 1, attribute.String("protocol", "bitswap"))
-			}
+			m.requestWithBitswapAttempt.Add(ctx, 1, attribute.String("protocol", "bitswap"))
 		case ProtocolGraphsync:
-			if !recordedGraphSync {
-				recordedGraphSync = true
-				m.requestWithGraphSyncAttempt.Add(ctx, 1, attribute.String("protocol", "graphsync"), attribute.String("sp_id", storageProviderID), attribute.String("fil_sp_id", attempt.FilSPID))
-			}
+			m.requestWithGraphSyncAttempt.Add(ctx, 1, attribute.String("protocol", "graphsync"), attribute.String("sp_id", storageProviderID), attribute.String("fil_sp_id", attempt.FilSPID))
 		case ProtocolHttp:
-			if !recordedHttp {
-				recordedHttp = true
-				m.requestWithHttpAttempt.Add(ctx, 1, attribute.String("protocol", "http"), attribute.String("sp_id", storageProviderID), attribute.String("fil_sp_id", attempt.FilSPID))
-			}
+			m.requestWithHttpAttempt.Add(ctx, 1, attribute.String("protocol", "http"), attribute.String("sp_id", storageProviderID), attribute.String("fil_sp_id", attempt.FilSPID))
 		}
 		if attempt.Error != "" {
 			switch protocolAttempted {
