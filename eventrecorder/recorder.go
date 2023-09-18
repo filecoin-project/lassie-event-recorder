@@ -227,25 +227,28 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 				lk.Lock()
 				defer lk.Unlock()
 				attempts[storageProviderID] = metrics.Attempt{
-					FilSPID:         filSPID,
-					Error:           retrievalAttempt.Error,
-					Protocol:        retrievalAttempt.Protocol,
-					TimeToFirstByte: timeToFirstByte,
+					FilSPID:          filSPID,
+					Error:            retrievalAttempt.Error,
+					Protocol:         retrievalAttempt.Protocol,
+					TimeToFirstByte:  timeToFirstByte,
+					BytesTransferred: retrievalAttempt.BytesTransferred,
 				}
 				query := `
 			  INSERT INTO retrieval_attempts(
 				  retrieval_id,
 				  storage_provider_id,
 				  time_to_first_byte,
+				  bytes_transferred,
 				  error,
 				  protocol
 			  )
-			  VALUES ($1, $2, $3, $4, $5)
+			  VALUES ($1, $2, $3, $4, $5, $6)
 			  `
 				batchRetrievalAttempts.Queue(query,
 					event.RetrievalID,
 					storageProviderID,
 					timeToFirstByte,
+					retrievalAttempt.BytesTransferred,
 					retrievalAttempt.Error,
 					retrievalAttempt.Protocol,
 				).Exec(func(ct pgconn.CommandTag) error {
