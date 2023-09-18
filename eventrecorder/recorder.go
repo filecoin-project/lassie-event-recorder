@@ -159,6 +159,8 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 		if event.TimeToFirstIndexerResult != "" {
 			timeToFirstIndexerResult, _ = time.ParseDuration(event.TimeToFirstIndexerResult)
 		}
+		filSPID := r.lassieSPIDToFilecoinSPID(ctx, event.StorageProviderID)
+
 		query := `
 		INSERT INTO aggregate_retrieval_events(
 			instance_id,
@@ -166,6 +168,7 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			root_cid,
 			url_path,
 			storage_provider_id,
+			filecoin_storage_provider_id,
 			time_to_first_byte,
 			bandwidth_bytes_sec,
 			bytes_transferred,
@@ -179,7 +182,7 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			protocols_attempted,
 			protocol_succeeded
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		`
 		batchQuery.Queue(query,
 			event.InstanceID,
@@ -187,6 +190,7 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			event.RootCid,
 			event.URLPath,
 			event.StorageProviderID,
+			filSPID,
 			timeToFirstByte,
 			event.Bandwidth,
 			event.BytesTransferred,
@@ -237,16 +241,18 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 			  INSERT INTO retrieval_attempts(
 				  retrieval_id,
 				  storage_provider_id,
+				  filecoin_storage_provider_id,
 				  time_to_first_byte,
 				  bytes_transferred,
 				  error,
 				  protocol
 			  )
-			  VALUES ($1, $2, $3, $4, $5, $6)
+			  VALUES ($1, $2, $3, $4, $5, $6, $7)
 			  `
 				batchRetrievalAttempts.Queue(query,
 					event.RetrievalID,
 					storageProviderID,
+					filSPID,
 					timeToFirstByte,
 					retrievalAttempt.BytesTransferred,
 					retrievalAttempt.Error,
@@ -263,9 +269,6 @@ func (r *EventRecorder) RecordAggregateEvents(ctx context.Context, events []Aggr
 				})
 			}(storageProviderID, retrievalAttempt)
 		}
-
-		filSPID := r.lassieSPIDToFilecoinSPID(ctx, event.StorageProviderID)
-
 		wg.Wait()
 
 		if r.cfg.metrics != nil {
