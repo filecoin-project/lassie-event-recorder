@@ -38,18 +38,20 @@ var expectedEvents = []ae{
 		protocolSucceeded:        "transport-bitswap",
 		attempts: map[string]metrics.Attempt{
 			"12D3KooWEqwTBN3GE4vT6DWZiKpq24UtSBmhhwM73vg7SfTjYWaF": {
-				Error:           "",
-				Protocol:        "transport-graphsync-filecoinv1",
-				TimeToFirstByte: 50 * time.Millisecond,
+				Error:            "",
+				Protocol:         "transport-graphsync-filecoinv1",
+				TimeToFirstByte:  50 * time.Millisecond,
+				BytesTransferred: 10001,
 			},
 			"12D3KooWHHzSeKaY8xuZVzkLbKFfvNgPPeKhFBGrMbNzbm5akpqu": {
 				Error:    "failed to dial",
 				Protocol: "transport-graphsync-filecoinv1",
 			},
 			"Bitswap": {
-				Error:           "",
-				Protocol:        "transport-bitswap",
-				TimeToFirstByte: 20 * time.Millisecond,
+				Error:            "",
+				Protocol:         "transport-bitswap",
+				TimeToFirstByte:  20 * time.Millisecond,
+				BytesTransferred: 20002,
 			},
 		},
 	},
@@ -85,18 +87,20 @@ var expectedEvents = []ae{
 		protocolSucceeded:        "transport-ipfs-gateway-http",
 		attempts: map[string]metrics.Attempt{
 			"12D3KooWDGBkHBZye7rN6Pz9ihEZrHnggoVRQh6eEtKP4z1K4KeE": {
-				Error:           "",
-				Protocol:        "transport-ipfs-gateway-http",
-				TimeToFirstByte: 100 * time.Millisecond,
+				Error:            "",
+				Protocol:         "transport-ipfs-gateway-http",
+				TimeToFirstByte:  100 * time.Millisecond,
+				BytesTransferred: 10001,
 			},
 			"12D3KooWHHzSeKaY8xuZVzkLbKFfvNgPPeKhFBGrMbNzbm5akpqu": {
 				Error:    "failed to dial",
 				Protocol: "transport-graphsync-filecoinv1",
 			},
 			"Bitswap": {
-				Error:           "",
-				Protocol:        "transport-bitswap",
-				TimeToFirstByte: 200 * time.Millisecond,
+				Error:            "",
+				Protocol:         "transport-bitswap",
+				TimeToFirstByte:  200 * time.Millisecond,
+				BytesTransferred: 20002,
 			},
 		},
 	},
@@ -154,6 +158,7 @@ func TestRecorderMetrics(t *testing.T) {
 			req.Equal(aa.Error, mm.aggregatedEvents[ii].attempts[k].Error)
 			req.Equal(aa.Protocol, mm.aggregatedEvents[ii].attempts[k].Protocol)
 			req.Equal(aa.TimeToFirstByte, mm.aggregatedEvents[ii].attempts[k].TimeToFirstByte)
+			req.Equal(aa.BytesTransferred, mm.aggregatedEvents[ii].attempts[k].BytesTransferred)
 		}
 	}
 }

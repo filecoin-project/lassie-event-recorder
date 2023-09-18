@@ -147,10 +147,11 @@ func (m *Metrics) HandleSuccessEvent(ctx context.Context, id types.RetrievalID, 
 }
 
 type Attempt struct {
-	FilSPID         string
-	Error           string
-	Protocol        string
-	TimeToFirstByte time.Duration
+	FilSPID          string
+	Error            string
+	Protocol         string
+	TimeToFirstByte  time.Duration
+	BytesTransferred uint64
 }
 
 func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
@@ -175,7 +176,11 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 		protocolAttempted := protocolFromMulticodecString(attempt.Protocol)
 		switch protocolAttempted {
 		case ProtocolBitswap:
-			m.requestWithBitswapAttempt.Add(ctx, 1, attribute.String("protocol", "bitswap"))
+			if storageProviderID != "Bitswap" {
+				m.requestWithGraphSyncAttempt.Add(ctx, 1, attribute.String("protocol", "bitswap"), attribute.String("sp_id", storageProviderID), attribute.String("fil_sp_id", attempt.FilSPID))
+			} else {
+				m.requestWithBitswapAttempt.Add(ctx, 1, attribute.String("protocol", "bitswap"))
+			}
 		case ProtocolGraphsync:
 			m.requestWithGraphSyncAttempt.Add(ctx, 1, attribute.String("protocol", "graphsync"), attribute.String("sp_id", storageProviderID), attribute.String("fil_sp_id", attempt.FilSPID))
 		case ProtocolHttp:

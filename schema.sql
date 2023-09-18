@@ -36,5 +36,6 @@ create table if not exists retrieval_attempts(
   time_to_first_byte bigint,
   error text,
   protocol character varying(256),
+  bytes_transferred bigint,
   FOREIGN KEY (retrieval_id) REFERENCES aggregate_retrieval_events (retrieval_id)
 );
