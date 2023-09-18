@@ -16,6 +16,7 @@ create table if not exists aggregate_retrieval_events(
   url_path text,
   instance_id character varying(64) not null,
   storage_provider_id character varying(256),
+  filecoin_storage_provider_id character varying(16),
   time_to_first_byte bigint,
   bandwidth_bytes_sec bigint,
   bytes_transferred bigint,
@@ -33,6 +34,7 @@ create table if not exists aggregate_retrieval_events(
 create table if not exists retrieval_attempts(
   retrieval_id uuid not null,
   storage_provider_id character varying(256),
+  filecoin_storage_provider_id character varying(16),
   time_to_first_byte bigint,
   error text,
   protocol character varying(256),
