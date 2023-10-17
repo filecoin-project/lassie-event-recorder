@@ -296,6 +296,11 @@ func (m *Metrics) Start() error {
 	); err != nil {
 		return err
 	}
+	if m.retrievalErrorDatatransferCount, err = meter.Int64Counter(meterName+"/retrieval_error_datatransfer_total",
+		instrument.WithDescription("The number of retrieval errors due to datatransfer requests that errored"),
+	); err != nil {
+		return err
+	}
 	if m.retrievalErrorFailedToDialCount, err = meter.Int64Counter(meterName+"/retrieval_error_failed_to_dial_total",
 		instrument.WithDescription("The number of retrieval errors because we could not connected to the provider"),
 	); err != nil {
@@ -404,6 +409,7 @@ type stats struct {
 	retrievalErrorNoUnsealedCount           instrument.Int64Counter
 	retrievalErrorDAGStoreCount             instrument.Int64Counter
 	retrievalErrorGraphsyncCount            instrument.Int64Counter
+	retrievalErrorDatatransferCount         instrument.Int64Counter
 	retrievalErrorFailedToDialCount         instrument.Int64Counter
 	retrievalErrorHTTPRemoteRequestNotFound instrument.Int64Counter
 	retrievalErrorHTTPRemoteRequestGone     instrument.Int64Counter

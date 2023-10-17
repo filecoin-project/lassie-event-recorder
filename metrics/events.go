@@ -19,7 +19,6 @@ var (
 
 // HandleFailureEvent is called when a query _or_ retrieval fails
 func (m *Metrics) HandleFailureEvent(ctx context.Context, id types.RetrievalID, phase types.Phase, storageProviderID string, details interface{}) {
-
 	detailsObj, ok := details.(map[string]interface{})
 	if !ok {
 		return
@@ -167,7 +166,8 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 	indexerCandidates int64,
 	indexerFiltered int64,
 	attempts map[string]Attempt,
-	protocolSucceeded string) {
+	protocolSucceeded string,
+) {
 	m.totalRequestCount.Add(ctx, 1)
 	failureCount := 0
 	var lowestTTFB time.Duration
@@ -246,7 +246,7 @@ func (m *Metrics) HandleAggregatedEvent(ctx context.Context,
 }
 
 func (m *Metrics) getMatchingErrorMetric(ctx context.Context, msg string) (instrument.Int64Counter, bool) {
-	var errorMetricMatches = []struct {
+	errorMetricMatches := []struct {
 		substr string
 		metric instrument.Int64Counter
 	}{
@@ -257,6 +257,7 @@ func (m *Metrics) getMatchingErrorMetric(ctx context.Context, msg string) (instr
 		{"miner is not accepting online retrieval deals", m.retrievalErrorNoOnlineCount},
 		{"unconfirmed block transfer", m.retrievalErrorUnconfirmedCount},
 		{"timeout after ", m.retrievalErrorTimeoutCount},
+		{"retrieval timed out after ", m.retrievalErrorTimeoutCount},
 		{"there is no unsealed piece containing payload cid", m.retrievalErrorNoUnsealedCount},
 		{"getting pieces for cid", m.retrievalErrorDAGStoreCount},
 		{"graphsync request failed to complete: request failed - unknown reason", m.retrievalErrorGraphsyncCount},
@@ -268,6 +269,7 @@ func (m *Metrics) getMatchingErrorMetric(ctx context.Context, msg string) (instr
 		{"unexpected block in CAR", m.retrievalErrorHTTPUnexpectedBlock},
 		{"missing block in CAR", m.retrievalErrorHTTPMissingBlock},
 		{"malformed CAR", m.retrievalErrorHTTPMalformedCar},
+		{"data transfer failed: datatransfer error: data transfer channel ", m.retrievalErrorDatatransferCount},
 	}
 
 	for _, match := range errorMetricMatches {
@@ -278,12 +280,14 @@ func (m *Metrics) getMatchingErrorMetric(ctx context.Context, msg string) (instr
 
 	return nil, false
 }
+
 func protocolFromSpID(storageProviderId string) string {
 	if storageProviderId == types.BitswapIndentifier {
 		return ProtocolBitswap
 	}
 	return ProtocolGraphsync
 }
+
 func protocolFromMulticodecString(multicodecCodeString string) string {
 	switch multicodecCodeString {
 	case multicodec.TransportBitswap.String():
