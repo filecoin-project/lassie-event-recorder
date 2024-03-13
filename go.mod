@@ -2,7 +2,6 @@ module github.com/filecoin-project/lassie-event-recorder
 
 go 1.21
 
-
 require (
 	github.com/filecoin-project/lassie v0.5.0
 	github.com/hashicorp/golang-lru v0.5.4
