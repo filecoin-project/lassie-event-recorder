@@ -1,6 +1,7 @@
 module github.com/filecoin-project/lassie-event-recorder
 
-go 1.20
+go 1.21
+
 
 require (
 	github.com/filecoin-project/lassie v0.5.0
